@@ -1,84 +1,145 @@
 import streamlit as st
+from datetime import datetime
 
-DRIVERS = {
-    "Ramesh Kumar (EMP001)": "EMP001",
-    "Suresh Patel (EMP002)": "EMP002",
-    "Mahesh Singh (EMP003)": "EMP003",
-    "Dinesh Rao (EMP004)": "EMP004",
-}
-
-
-def driver_selector():
-    st.subheader("Driver")
-    selected = st.selectbox("Select your name", list(DRIVERS.keys()), label_visibility="collapsed")
-    emp_id = DRIVERS[selected]
-    st.caption(f"Employee ID: {emp_id}")
-    return selected, emp_id
+from config import DRIVERS
+from auth import get_credentials
+from drive import upload_image
+from sheets import append_trip
 
 
-def odometer_inputs():
-    st.subheader("Odometer Reading")
+def init_state():
+    st.session_state.setdefault("phase", "start")
+    st.session_state.setdefault("trip", {})
+
+
+def trip_id(emp_id: str) -> str:
+    return f"{emp_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+
+def camera_block(label: str, key: str):
+    st.markdown(f"**{label}**")
+    return st.camera_input("", key=key, label_visibility="collapsed")
+
+
+def show_start_form():
+    st.title("🚗 Zippi Trip Tracker")
+    st.subheader("Start Trip")
+
+    driver_name = st.selectbox("Driver Name", list(DRIVERS.keys()))
+    emp_id = DRIVERS[driver_name]
+    st.caption(f"Employee ID: **{emp_id}**  |  Date: **{datetime.today().strftime('%d %b %Y')}**")
+
+    st.divider()
+    start_km = st.number_input("Start Odometer (km)", min_value=0, step=1, format="%d")
+
+    st.divider()
+    st.subheader("📸 Start Photos")
+    left = camera_block("Left Side of Vehicle", "start_left")
+    right = camera_block("Right Side of Vehicle", "start_right")
+    odo = camera_block("Odometer", "start_odo")
+
+    st.divider()
+    if st.button("▶  Start Trip", use_container_width=True, type="primary"):
+        missing = [n for n, f in [("Left side", left), ("Right side", right), ("Odometer", odo)] if not f]
+        if missing:
+            st.warning(f"Please capture: {', '.join(missing)}")
+        else:
+            st.session_state["trip"] = {
+                "trip_id": trip_id(emp_id),
+                "driver_name": driver_name,
+                "emp_id": emp_id,
+                "date": datetime.today().strftime("%Y-%m-%d"),
+                "start_time": datetime.now().strftime("%H:%M:%S"),
+                "start_km": start_km,
+                "start_left": left.getvalue(),
+                "start_right": right.getvalue(),
+                "start_odo": odo.getvalue(),
+            }
+            st.session_state["phase"] = "end"
+            st.rerun()
+
+
+def show_end_form():
+    trip = st.session_state["trip"]
+
+    st.title("🚗 Zippi Trip Tracker")
+    st.success(
+        f"Trip in progress — {trip['driver_name']} ({trip['emp_id']})\n\n"
+        f"Started at **{trip['start_time']}** | Start KM: **{trip['start_km']}**"
+    )
+
+    st.subheader("End Trip")
+    end_km = st.number_input("End Odometer (km)", min_value=0, step=1, format="%d")
+
+    st.divider()
+    st.subheader("📸 End Photos")
+    left = camera_block("Left Side of Vehicle", "end_left")
+    right = camera_block("Right Side of Vehicle", "end_right")
+    odo = camera_block("Odometer", "end_odo")
+
+    st.divider()
+
     col1, col2 = st.columns(2)
     with col1:
-        start_km = st.number_input("Start (km)", min_value=0, step=1, format="%d")
+        submit = st.button("✅  Submit Trip", use_container_width=True, type="primary")
     with col2:
-        end_km = st.number_input("End (km)", min_value=0, step=1, format="%d")
-    return start_km, end_km
+        cancel = st.button("✖  Cancel Trip", use_container_width=True)
 
+    if cancel:
+        st.session_state["phase"] = "start"
+        st.session_state["trip"] = {}
+        st.rerun()
 
-def image_uploads():
-    st.subheader("Photos")
-    labels = ["Start Odometer", "End Odometer", "Vehicle / Other"]
-    files = []
-    for label in labels:
-        f = st.camera_input(label, key=f"cam_{label}")
-        files.append(f)
-    return files
+    if submit:
+        missing = [n for n, f in [("Left side", left), ("Right side", right), ("Odometer", odo)] if not f]
+        if missing:
+            st.warning(f"Please capture: {', '.join(missing)}")
+            return
+        if end_km <= trip["start_km"]:
+            st.warning("End odometer must be greater than start odometer.")
+            return
 
+        with st.spinner("Uploading photos and saving trip..."):
+            creds = get_credentials()
+            end_time = datetime.now().strftime("%H:%M:%S")
 
-def trip_actions():
-    st.subheader("Trip")
-    col1, col2 = st.columns(2)
-    with col1:
-        start = st.button("▶  Start Trip", use_container_width=True, type="primary")
-    with col2:
-        end = st.button("⏹  End Trip", use_container_width=True)
-    return start, end
+            def upload(data, name):
+                return upload_image(creds, data, f"{trip['trip_id']}_{name}.jpg")
+
+            row = {
+                "Trip ID": trip["trip_id"],
+                "Driver Name": trip["driver_name"],
+                "Employee ID": trip["emp_id"],
+                "Date": trip["date"],
+                "Start Time": trip["start_time"],
+                "End Time": end_time,
+                "Start Odometer (km)": trip["start_km"],
+                "End Odometer (km)": end_km,
+                "Distance (km)": end_km - trip["start_km"],
+                "Start - Left Photo": upload(trip["start_left"], "start_left"),
+                "Start - Right Photo": upload(trip["start_right"], "start_right"),
+                "Start - Odometer Photo": upload(trip["start_odo"], "start_odo"),
+                "End - Left Photo": upload(left.getvalue(), "end_left"),
+                "End - Right Photo": upload(right.getvalue(), "end_right"),
+                "End - Odometer Photo": upload(odo.getvalue(), "end_odo"),
+                "Submitted At": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            append_trip(creds, row)
+
+        st.balloons()
+        st.success(f"Trip saved! Distance: {end_km - trip['start_km']} km")
+        st.session_state["phase"] = "start"
+        st.session_state["trip"] = {}
 
 
 def main():
     st.set_page_config(page_title="Zippi Trip Tracker", page_icon="🚗", layout="centered")
-    st.title("🚗 Zippi Trip Tracker")
+    init_state()
 
-    driver_name, emp_id = driver_selector()
-    st.divider()
-
-    start_km, end_km = odometer_inputs()
-    st.divider()
-
-    images = image_uploads()
-    st.divider()
-
-    start_clicked, end_clicked = trip_actions()
-
-    if start_clicked:
-        if not any(images[:1]):
-            st.warning("Please upload the Start Odometer photo before starting.")
-        else:
-            st.success(f"Trip started for {driver_name} at {start_km} km.")
-            st.session_state["trip_started"] = True
-
-    if end_clicked:
-        if not st.session_state.get("trip_started"):
-            st.error("No active trip found. Press Start Trip first.")
-        elif end_km <= start_km:
-            st.warning("End km must be greater than Start km.")
-        elif not any(images[1:2]):
-            st.warning("Please upload the End Odometer photo before ending.")
-        else:
-            distance = end_km - start_km
-            st.success(f"Trip ended. Distance: {distance} km.")
-            st.session_state["trip_started"] = False
+    if st.session_state["phase"] == "start":
+        show_start_form()
+    else:
+        show_end_form()
 
 
 if __name__ == "__main__":
