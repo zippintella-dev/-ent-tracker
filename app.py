@@ -1,10 +1,10 @@
 import streamlit as st
 from datetime import datetime
 
-from config import DRIVERS
 from auth import get_credentials
 from storage import upload_image
 from sheets import append_trip
+from db import get_drivers
 
 
 def init_state():
@@ -25,8 +25,9 @@ def show_start_form():
     st.title("🚗 Zippi Trip Tracker")
     st.subheader("Start Trip")
 
-    driver_name = st.selectbox("Driver Name", list(DRIVERS.keys()))
-    emp_id = DRIVERS[driver_name]
+    drivers = get_drivers()
+    driver_name = st.selectbox("Driver Name", list(drivers.keys()))
+    emp_id = drivers[driver_name]
     st.caption(f"Employee ID: **{emp_id}**  |  Date: **{datetime.today().strftime('%d %b %Y')}**")
 
     st.divider()
