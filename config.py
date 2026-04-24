@@ -23,6 +23,8 @@ SHEET_COLUMNS = [
     "Start Odometer (km)",
     "End Odometer (km)",
     "Distance (km)",
+    "Start Location",
+    "End Location",
     "Start - Left Photo",
     "Start - Right Photo",
     "Start - Odometer Photo",
