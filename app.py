@@ -3,7 +3,7 @@ from datetime import datetime
 
 from config import DRIVERS
 from auth import get_credentials
-from drive import upload_image
+from storage import upload_image
 from sheets import append_trip
 
 
@@ -104,7 +104,7 @@ def show_end_form():
             end_time = datetime.now().strftime("%H:%M:%S")
 
             def upload(data, name):
-                return upload_image(creds, data, f"{trip['trip_id']}_{name}.jpg")
+                return upload_image(data, f"{trip['trip_id']}_{name}.jpg")
 
             row = {
                 "Trip ID": trip["trip_id"],
