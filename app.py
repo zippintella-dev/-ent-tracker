@@ -130,6 +130,7 @@ def show_end_form():
         st.success(f"Trip saved! Distance: {end_km - trip['start_km']} km")
         st.session_state["phase"] = "start"
         st.session_state["trip"] = {}
+        st.rerun()
 
 
 def main():
