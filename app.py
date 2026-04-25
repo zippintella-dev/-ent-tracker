@@ -30,6 +30,14 @@ INSTALL_GUIDE_HTML = """
 """
 
 
+def show_header():
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        show_header()
+    with col2:
+        st.image("logo.png", width=80)
+
+
 def show_install_guide():
     with st.expander("📲 Add app to Home Screen"):
         st.components.v1.html(INSTALL_GUIDE_HTML, height=160)
@@ -59,7 +67,7 @@ def maps_link(loc) -> str:
 
 
 def show_start_form():
-    st.title("🚗 Zippi Trip Tracker")
+    show_header()
     show_install_guide()
     st.subheader("Start Trip")
 
@@ -108,7 +116,7 @@ def show_start_form():
 def show_end_form():
     trip = st.session_state["trip"]
 
-    st.title("🚗 Zippi Trip Tracker")
+    show_header()
     st.success(
         f"Trip in progress — {trip['driver_name']} ({trip['emp_id']})\n\n"
         f"Started at **{trip['start_time']}** | Start KM: **{trip['start_km']}**"
@@ -196,7 +204,7 @@ def show_end_form():
 def show_saved_screen():
     last = st.session_state["last_trip"]
 
-    st.title("🚗 Zippi Trip Tracker")
+    show_header()
     st.balloons()
     st.success("✅ Trip Saved!")
 
