@@ -33,7 +33,7 @@ INSTALL_GUIDE_HTML = """
 def show_header():
     col1, col2 = st.columns([4, 1])
     with col1:
-        show_header()
+        st.title("🚗 Zippi Trip Tracker")
     with col2:
         st.image("logo.png", width=80)
 
