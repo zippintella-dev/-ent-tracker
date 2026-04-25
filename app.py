@@ -8,6 +8,33 @@ from sheets import append_trip
 from db import get_drivers
 
 
+INSTALL_GUIDE_HTML = """
+<style>
+.install-box {
+    background: #f0f4ff;
+    border: 1px solid #c7d3f5;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    line-height: 1.7;
+}
+.install-box b { color: #1a1a2e; }
+</style>
+<div class="install-box">
+  <b>📱 iPhone / iPad (Safari)</b><br>
+  Tap the <b>Share</b> button (rectangle with arrow) at the bottom of Safari → <b>Add to Home Screen</b> → <b>Add</b>
+  <br><br>
+  <b>🤖 Android (Chrome)</b><br>
+  Tap the <b>⋮ Menu</b> (top right) → <b>Add to Home screen</b> → <b>Add</b>
+</div>
+"""
+
+
+def show_install_guide():
+    with st.expander("📲 Add app to Home Screen"):
+        st.components.v1.html(INSTALL_GUIDE_HTML, height=160)
+
+
 def init_state():
     st.session_state.setdefault("phase", "start")
     st.session_state.setdefault("trip", {})
@@ -33,6 +60,7 @@ def maps_link(loc) -> str:
 
 def show_start_form():
     st.title("🚗 Zippi Trip Tracker")
+    show_install_guide()
     st.subheader("Start Trip")
 
     location = get_geolocation()
