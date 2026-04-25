@@ -25,48 +25,11 @@ def show_header():
     """, unsafe_allow_html=True)
 
 
-INSTALL_HTML = """
-<style>
-.hs-wrap{font-family:sans-serif;margin:6px 0 10px 0;}
-.hs-title{font-size:15px;font-weight:700;margin-bottom:10px;color:#1a1a2e;}
-.hs-card{border-radius:12px;padding:12px 14px;margin-bottom:8px;font-size:13px;line-height:1.8;}
-.hs-ios{background:#e8f4fd;border:1px solid #90c8f0;}
-.hs-and{background:#e8f8ee;border:1px solid #7ecf9e;}
-.hs-step{display:inline-block;background:#fff;border-radius:50%;
-         width:20px;height:20px;text-align:center;line-height:20px;
-         font-weight:700;font-size:11px;margin-right:6px;}
-</style>
-<div class="hs-wrap">
-  <div class="hs-title">📲 Add to Home Screen</div>
-  <div class="hs-card hs-ios">
-    <b>📱 iPhone / iPad</b> &nbsp;(use Safari)<br>
-    <span class="hs-step">1</span>Tap <b>Share ↑</b> at the bottom<br>
-    <span class="hs-step">2</span>Tap <b>Add to Home Screen</b><br>
-    <span class="hs-step">3</span>Tap <b>Add</b> — done!
-  </div>
-  <div class="hs-card hs-and">
-    <b>🤖 Android</b> &nbsp;(use Chrome)<br>
-    <span class="hs-step">1</span>Tap <b>⋮ Menu</b> (top right)<br>
-    <span class="hs-step">2</span>Tap <b>Add to Home screen</b><br>
-    <span class="hs-step">3</span>Tap <b>Add</b> — done!
-  </div>
-</div>
-"""
-
-
-def show_install_guide():
-    if not st.session_state.get("install_dismissed"):
-        st.components.v1.html(INSTALL_HTML, height=230)
-        if st.button("✕  Dismiss", key="dismiss_install"):
-            st.session_state["install_dismissed"] = True
-            st.rerun()
-
 
 def init_state():
     st.session_state.setdefault("phase", "start")
     st.session_state.setdefault("trip", {})
     st.session_state.setdefault("last_trip", {})
-    st.session_state.setdefault("install_dismissed", False)
 
 
 def trip_id(emp_id: str) -> str:
@@ -88,7 +51,6 @@ def maps_link(loc) -> str:
 
 def show_start_form():
     show_header()
-    show_install_guide()
     st.subheader("Start Trip")
 
     location = get_geolocation()
