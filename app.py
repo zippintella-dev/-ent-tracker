@@ -6,7 +6,7 @@ from streamlit_js_eval import get_geolocation
 from auth import get_credentials
 from storage import upload_image
 from sheets import append_trip
-from db import get_drivers
+from db import get_drivers, get_clients, get_vehicles
 
 
 @st.cache_data
@@ -64,6 +64,14 @@ def show_start_form():
     emp_id = drivers[driver_name]
     st.caption(f"Employee ID: **{emp_id}**  |  Date: **{datetime.today().strftime('%d %b %Y')}**")
 
+    clients = get_clients()
+    vehicles = get_vehicles()
+    if not clients or not vehicles:
+        st.warning("No clients or vehicles configured yet. Ask your admin to add them.")
+        return
+    client = st.selectbox("Client", clients)
+    vehicle_number = st.selectbox("Vehicle Number", vehicles)
+
     st.divider()
     start_km = st.number_input("Start Odometer (km)", min_value=0, step=1, format="%d")
 
@@ -83,6 +91,8 @@ def show_start_form():
                 "trip_id": trip_id(emp_id),
                 "driver_name": driver_name,
                 "emp_id": emp_id,
+                "client": client,
+                "vehicle_number": vehicle_number,
                 "date": datetime.today().strftime("%Y-%m-%d"),
                 "start_time": datetime.now().strftime("%H:%M:%S"),
                 "start_km": start_km,
@@ -156,6 +166,8 @@ def show_end_form():
                     "Trip ID": trip["trip_id"],
                     "Driver Name": trip["driver_name"],
                     "Employee ID": trip["emp_id"],
+                    "Client": trip["client"],
+                    "Vehicle Number": trip["vehicle_number"],
                     "Date": trip["date"],
                     "Start Time": trip["start_time"],
                     "End Time": end_time,
