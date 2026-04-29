@@ -141,35 +141,41 @@ def show_end_form():
             st.warning("End odometer must be greater than start odometer.")
             return
 
-        with st.spinner("Uploading photos and saving trip..."):
-            creds = get_credentials()
-            end_time = datetime.now().strftime("%H:%M:%S")
-            distance = end_km - trip["start_km"]
+        assert left and right and odo  # guaranteed by missing check above
 
-            def upload(data, name):
-                return upload_image(data, f"{trip['trip_id']}_{name}.jpg")
+        try:
+            with st.spinner("Uploading photos and saving trip..."):
+                creds = get_credentials()
+                end_time = datetime.now().strftime("%H:%M:%S")
+                distance = end_km - trip["start_km"]
 
-            row = {
-                "Trip ID": trip["trip_id"],
-                "Driver Name": trip["driver_name"],
-                "Employee ID": trip["emp_id"],
-                "Date": trip["date"],
-                "Start Time": trip["start_time"],
-                "End Time": end_time,
-                "Start Odometer (km)": trip["start_km"],
-                "End Odometer (km)": end_km,
-                "Distance (km)": distance,
-                "Start Location": trip["start_location"],
-                "End Location": maps_link(location),
-                "Start - Left Photo": upload(trip["start_left"], "start_left"),
-                "Start - Right Photo": upload(trip["start_right"], "start_right"),
-                "Start - Odometer Photo": upload(trip["start_odo"], "start_odo"),
-                "End - Left Photo": upload(left.getvalue(), "end_left"),
-                "End - Right Photo": upload(right.getvalue(), "end_right"),
-                "End - Odometer Photo": upload(odo.getvalue(), "end_odo"),
-                "Submitted At": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            append_trip(creds, row)
+                def upload(data, name):
+                    return upload_image(data, f"{trip['trip_id']}_{name}.jpg")
+
+                row = {
+                    "Trip ID": trip["trip_id"],
+                    "Driver Name": trip["driver_name"],
+                    "Employee ID": trip["emp_id"],
+                    "Date": trip["date"],
+                    "Start Time": trip["start_time"],
+                    "End Time": end_time,
+                    "Start Odometer (km)": trip["start_km"],
+                    "End Odometer (km)": end_km,
+                    "Distance (km)": distance,
+                    "Start Location": trip["start_location"],
+                    "End Location": maps_link(location),
+                    "Start - Left Photo": upload(trip["start_left"], "start_left"),
+                    "Start - Right Photo": upload(trip["start_right"], "start_right"),
+                    "Start - Odometer Photo": upload(trip["start_odo"], "start_odo"),
+                    "End - Left Photo": upload(left.getvalue(), "end_left"),
+                    "End - Right Photo": upload(right.getvalue(), "end_right"),
+                    "End - Odometer Photo": upload(odo.getvalue(), "end_odo"),
+                    "Submitted At": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                append_trip(creds, row)
+        except Exception as e:
+            st.error(f"Failed to save trip: {e}")
+            return
 
         st.session_state["last_trip"] = {
             "driver_name": trip["driver_name"],

@@ -1,14 +1,10 @@
 import gspread
-import streamlit as st
 from config import SHEET_ID, SHEET_NAME
 
 
-@st.cache_resource
-def _get_sheet(_creds):
-    client = gspread.authorize(_creds)
-    return client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
-
-
 def append_trip(creds, row: dict):
-    sheet = _get_sheet(creds)
+    client = gspread.authorize(creds)
+    spreadsheet = client.open_by_key(SHEET_ID)
+    sheet = spreadsheet.worksheet(SHEET_NAME)
     sheet.append_row(list(row.values()), value_input_option="USER_ENTERED")
+    print(f"✅ Written to: {spreadsheet.title} → {sheet.title} (row ~{sheet.row_count})")
