@@ -75,7 +75,7 @@ def show_start_form():
     st.divider()
     start_km = st.number_input("Start Odometer (km)", min_value=0, step=1, format="%d")
 
-    loc = streamlit_geolocation(key="geo_start")
+    loc = streamlit_geolocation()
     if loc and loc.get("latitude") is not None:
         st.session_state["location_start"] = loc
     if st.session_state.get("location_start"):
@@ -172,7 +172,7 @@ def show_end_form():
     st.subheader("End Trip")
     end_km = st.number_input("End Odometer (km)", min_value=0, step=1, format="%d")
 
-    loc = streamlit_geolocation(key="geo_end")
+    loc = streamlit_geolocation()
     if loc and loc.get("latitude") is not None:
         st.session_state["location_end"] = loc
     if st.session_state.get("location_end"):
