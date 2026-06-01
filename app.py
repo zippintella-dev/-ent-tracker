@@ -7,6 +7,7 @@ from auth import get_credentials
 from storage import upload_image
 from sheets import append_trip
 from db import get_drivers, get_clients, get_vehicles
+from alert_monitor import get_roster_entry, calculate_delay
 
 
 @st.cache_data
@@ -87,19 +88,23 @@ def show_start_form():
         if missing:
             st.warning(f"Please capture: {', '.join(missing)}")
         else:
+            today = datetime.today().strftime("%Y-%m-%d")
+            roster = get_roster_entry(get_credentials(), emp_id, today)
+            expected_start = roster["Expected Start Time"] if roster else ""
             st.session_state["trip"] = {
                 "trip_id": trip_id(emp_id),
                 "driver_name": driver_name,
                 "emp_id": emp_id,
                 "client": client,
                 "vehicle_number": vehicle_number,
-                "date": datetime.today().strftime("%Y-%m-%d"),
+                "date": today,
                 "start_time": datetime.now().strftime("%H:%M:%S"),
                 "start_km": start_km,
                 "start_location": maps_link(location),
                 "start_left": left.getvalue(),
                 "start_right": right.getvalue(),
                 "start_odo": odo.getvalue(),
+                "expected_start_time": expected_start,
             }
             st.session_state["phase"] = "end"
             st.rerun()
@@ -158,6 +163,8 @@ def show_end_form():
                 creds = get_credentials()
                 end_time = datetime.now().strftime("%H:%M:%S")
                 distance = end_km - trip["start_km"]
+                delay_minutes = calculate_delay(trip["start_time"], trip.get("expected_start_time", ""))
+                status = "On Time" if delay_minutes == 0 else "Delayed"
 
                 def upload(data, name):
                     return upload_image(data, f"{trip['trip_id']}_{name}.jpg")
@@ -171,6 +178,9 @@ def show_end_form():
                     "Date": trip["date"],
                     "Start Time": trip["start_time"],
                     "End Time": end_time,
+                    "Expected Start Time": trip.get("expected_start_time", ""),
+                    "Delay Minutes": delay_minutes,
+                    "Status": status,
                     "Start Odometer (km)": trip["start_km"],
                     "End Odometer (km)": end_km,
                     "Distance (km)": distance,

@@ -7,6 +7,8 @@ DRIVERS = {
 
 SHEET_ID = "19Vuv9ZJsWsNBE0iM1JpRl-ADH7X84INVTUrLE75aR3Q"
 SHEET_NAME = "Sheet1"
+ROSTER_SHEET_NAME = "Daily Roster"
+ALERT_LOG_SHEET_NAME = "Alert Log"
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -17,9 +19,14 @@ SHEET_COLUMNS = [
     "Trip ID",
     "Driver Name",
     "Employee ID",
+    "Client",
+    "Vehicle Number",
     "Date",
     "Start Time",
     "End Time",
+    "Expected Start Time",
+    "Delay Minutes",
+    "Status",
     "Start Odometer (km)",
     "End Odometer (km)",
     "Distance (km)",
