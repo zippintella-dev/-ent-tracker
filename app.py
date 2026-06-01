@@ -2,20 +2,7 @@ import base64
 import streamlit as st
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from streamlit_js_eval import streamlit_js_eval
-
 IST = ZoneInfo("Asia/Kolkata")
-
-_GEO_JS = """
-await new Promise((resolve) => {
-    if (!navigator.geolocation) { resolve(null); return; }
-    navigator.geolocation.getCurrentPosition(
-        (p) => resolve({lat: p.coords.latitude, lng: p.coords.longitude}),
-        ()  => resolve(null),
-        {enableHighAccuracy: false, timeout: 10000, maximumAge: 300000}
-    );
-})
-"""
 
 from auth import get_credentials
 from storage import upload_image
@@ -45,8 +32,6 @@ def init_state():
     st.session_state.setdefault("phase", "start")
     st.session_state.setdefault("trip", {})
     st.session_state.setdefault("last_trip", {})
-    st.session_state.setdefault("location_start", None)
-    st.session_state.setdefault("location_end", None)
 
 
 def trip_id(emp_id: str) -> str:
@@ -58,23 +43,11 @@ def camera_block(label: str, key: str):
     return st.camera_input("", key=key, label_visibility="collapsed")
 
 
-def maps_link(loc) -> str:
-    if not loc or "lat" not in loc or "lng" not in loc:
-        return "Not available"
-    return f"https://maps.google.com/?q={loc['lat']},{loc['lng']}"
 
 
 def show_start_form():
     show_header()
     st.subheader("Start Trip")
-
-    location = streamlit_js_eval(js_expressions=_GEO_JS, key="geo_start")
-    if location:
-        st.session_state["location_start"] = location
-    if st.session_state.get("location_start"):
-        st.caption("📍 Location captured")
-    else:
-        st.caption("📍 Waiting for location — allow access if prompted")
 
     drivers = get_drivers()
     driver_name = st.selectbox("Driver Name", list(drivers.keys()))
@@ -91,6 +64,7 @@ def show_start_form():
 
     st.divider()
     start_km = st.number_input("Start Odometer (km)", min_value=0, step=1, format="%d")
+    start_location = st.text_input("Start Location", placeholder="e.g. Electronic City, Bangalore")
 
     st.divider()
     st.subheader("📸 Start Photos")
@@ -135,7 +109,7 @@ def show_start_form():
                         "Start Odometer (km)": start_km,
                         "End Odometer (km)": "",
                         "Distance (km)": "",
-                        "Start Location": maps_link(st.session_state.get("location_start")),
+                        "Start Location": start_location,
                         "End Location": "",
                         "Start - Left Photo": start_left_url,
                         "Start - Right Photo": start_right_url,
@@ -158,7 +132,7 @@ def show_start_form():
                 "date": today,
                 "start_time": start_time,
                 "start_km": start_km,
-                "start_location": maps_link(st.session_state.get("location_start")),
+                "start_location": start_location,
                 "expected_start_time": expected_start,
                 "delay_minutes": delay_minutes,
                 "status": status,
@@ -176,16 +150,9 @@ def show_end_form():
         f"Started at **{trip['start_time']}** | Start KM: **{trip['start_km']}**"
     )
 
-    location = streamlit_js_eval(js_expressions=_GEO_JS, key="geo_end")
-    if location:
-        st.session_state["location_end"] = location
-    if st.session_state.get("location_end"):
-        st.caption("📍 Location captured")
-    else:
-        st.caption("📍 Waiting for location — allow access if prompted")
-
     st.subheader("End Trip")
     end_km = st.number_input("End Odometer (km)", min_value=0, step=1, format="%d")
+    end_location = st.text_input("End Location", placeholder="e.g. Whitefield, Bangalore")
 
     st.divider()
     st.subheader("📸 End Photos")
@@ -204,7 +171,6 @@ def show_end_form():
     if cancel:
         st.session_state["phase"] = "start"
         st.session_state["trip"] = {}
-        st.session_state["location_end"] = None
         st.rerun()
 
     if submit:
@@ -231,7 +197,7 @@ def show_end_form():
                     "End Time": end_time,
                     "End Odometer (km)": end_km,
                     "Distance (km)": distance,
-                    "End Location": maps_link(st.session_state.get("location_end")),
+                    "End Location": end_location,
                     "End - Left Photo": upload(left.getvalue(), "end_left"),
                     "End - Right Photo": upload(right.getvalue(), "end_right"),
                     "End - Odometer Photo": upload(odo.getvalue(), "end_odo"),
@@ -270,8 +236,6 @@ def show_saved_screen():
     if st.button("▶  Start Next Trip", use_container_width=True, type="primary"):
         st.session_state["phase"] = "start"
         st.session_state["last_trip"] = {}
-        st.session_state["location_start"] = None
-        st.session_state["location_end"] = None
         st.rerun()
 
 
