@@ -13,11 +13,21 @@ def get_credentials():
     return Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 
 
+def _normalize_date(value: str) -> str:
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(str(value).strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return str(value).strip()
+
+
 def get_roster_entry(creds, emp_id: str, date_str: str) -> dict | None:
     client = gspread.authorize(creds)
     sheet = client.open_by_key(SHEET_ID).worksheet(ROSTER_SHEET_NAME)
     for row in sheet.get_all_records():
-        if str(row.get("Employee ID")) == str(emp_id) and str(row.get("Date")) == date_str:
+        if (str(row.get("Employee ID")) == str(emp_id)
+                and _normalize_date(str(row.get("Date", ""))) == date_str):
             return row
     return None
 

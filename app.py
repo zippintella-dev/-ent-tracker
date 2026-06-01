@@ -31,6 +31,8 @@ def init_state():
     st.session_state.setdefault("phase", "start")
     st.session_state.setdefault("trip", {})
     st.session_state.setdefault("last_trip", {})
+    st.session_state.setdefault("location_start", None)
+    st.session_state.setdefault("location_end", None)
 
 
 def trip_id(emp_id: str) -> str:
@@ -56,6 +58,8 @@ def show_start_form():
 
     location = get_geolocation()
     if location:
+        st.session_state["location_start"] = location
+    if st.session_state.get("location_start"):
         st.caption("📍 Location captured")
     else:
         st.caption("📍 Waiting for location — allow access if prompted")
@@ -119,7 +123,7 @@ def show_start_form():
                         "Start Odometer (km)": start_km,
                         "End Odometer (km)": "",
                         "Distance (km)": "",
-                        "Start Location": maps_link(location),
+                        "Start Location": maps_link(st.session_state.get("location_start")),
                         "End Location": "",
                         "Start - Left Photo": start_left_url,
                         "Start - Right Photo": start_right_url,
@@ -142,7 +146,7 @@ def show_start_form():
                 "date": today,
                 "start_time": start_time,
                 "start_km": start_km,
-                "start_location": maps_link(location),
+                "start_location": maps_link(st.session_state.get("location_start")),
                 "expected_start_time": expected_start,
                 "delay_minutes": delay_minutes,
                 "status": status,
@@ -162,6 +166,8 @@ def show_end_form():
 
     location = get_geolocation()
     if location:
+        st.session_state["location_end"] = location
+    if st.session_state.get("location_end"):
         st.caption("📍 Location captured")
     else:
         st.caption("📍 Waiting for location — allow access if prompted")
@@ -186,6 +192,7 @@ def show_end_form():
     if cancel:
         st.session_state["phase"] = "start"
         st.session_state["trip"] = {}
+        st.session_state["location_end"] = None
         st.rerun()
 
     if submit:
@@ -212,7 +219,7 @@ def show_end_form():
                     "End Time": end_time,
                     "End Odometer (km)": end_km,
                     "Distance (km)": distance,
-                    "End Location": maps_link(location),
+                    "End Location": maps_link(st.session_state.get("location_end")),
                     "End - Left Photo": upload(left.getvalue(), "end_left"),
                     "End - Right Photo": upload(right.getvalue(), "end_right"),
                     "End - Odometer Photo": upload(odo.getvalue(), "end_odo"),
@@ -251,6 +258,8 @@ def show_saved_screen():
     if st.button("▶  Start Next Trip", use_container_width=True, type="primary"):
         st.session_state["phase"] = "start"
         st.session_state["last_trip"] = {}
+        st.session_state["location_start"] = None
+        st.session_state["location_end"] = None
         st.rerun()
 
 
