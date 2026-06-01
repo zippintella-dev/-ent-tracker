@@ -2,9 +2,20 @@ import base64
 import streamlit as st
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from streamlit_js_eval import get_geolocation
+from streamlit_js_eval import streamlit_js_eval
 
 IST = ZoneInfo("Asia/Kolkata")
+
+_GEO_JS = """
+await new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+        (p) => resolve({lat: p.coords.latitude, lng: p.coords.longitude}),
+        ()  => resolve(null),
+        {enableHighAccuracy: false, timeout: 10000, maximumAge: 300000}
+    );
+})
+"""
 
 from auth import get_credentials
 from storage import upload_image
@@ -48,18 +59,16 @@ def camera_block(label: str, key: str):
 
 
 def maps_link(loc) -> str:
-    if not loc or "coords" not in loc:
+    if not loc or "lat" not in loc or "lng" not in loc:
         return "Not available"
-    lat = loc["coords"]["latitude"]
-    lng = loc["coords"]["longitude"]
-    return f"https://maps.google.com/?q={lat},{lng}"
+    return f"https://maps.google.com/?q={loc['lat']},{loc['lng']}"
 
 
 def show_start_form():
     show_header()
     st.subheader("Start Trip")
 
-    location = get_geolocation(component_key="geo_start")
+    location = streamlit_js_eval(js_expressions=_GEO_JS, key="geo_start")
     if location:
         st.session_state["location_start"] = location
     if st.session_state.get("location_start"):
@@ -167,7 +176,7 @@ def show_end_form():
         f"Started at **{trip['start_time']}** | Start KM: **{trip['start_km']}**"
     )
 
-    location = get_geolocation(component_key="geo_end")
+    location = streamlit_js_eval(js_expressions=_GEO_JS, key="geo_end")
     if location:
         st.session_state["location_end"] = location
     if st.session_state.get("location_end"):
