@@ -5,7 +5,7 @@ from streamlit_js_eval import get_geolocation
 
 from auth import get_credentials
 from storage import upload_image
-from sheets import append_trip
+from sheets import append_trip, update_trip_end
 from db import get_drivers, get_clients, get_vehicles
 from alert_monitor import get_roster_entry, calculate_delay
 
@@ -88,23 +88,64 @@ def show_start_form():
         if missing:
             st.warning(f"Please capture: {', '.join(missing)}")
         else:
-            today = datetime.today().strftime("%Y-%m-%d")
-            roster = get_roster_entry(get_credentials(), emp_id, today)
-            expected_start = roster["Expected Start Time"] if roster else ""
+            try:
+                with st.spinner("Starting trip..."):
+                    creds = get_credentials()
+                    today = datetime.today().strftime("%Y-%m-%d")
+                    start_time = datetime.now().strftime("%H:%M:%S")
+                    tid = trip_id(emp_id)
+
+                    roster = get_roster_entry(creds, emp_id, today)
+                    expected_start = roster["Expected Start Time"] if roster else ""
+                    delay_minutes = calculate_delay(start_time, expected_start)
+                    status = "On Time" if delay_minutes == 0 else "Delayed"
+
+                    start_left_url = upload_image(left.getvalue(), f"{tid}_start_left.jpg")
+                    start_right_url = upload_image(right.getvalue(), f"{tid}_start_right.jpg")
+                    start_odo_url = upload_image(odo.getvalue(), f"{tid}_start_odo.jpg")
+
+                    append_trip(creds, {
+                        "Trip ID": tid,
+                        "Driver Name": driver_name,
+                        "Employee ID": emp_id,
+                        "Client": client,
+                        "Vehicle Number": vehicle_number,
+                        "Date": today,
+                        "Start Time": start_time,
+                        "End Time": "",
+                        "Expected Start Time": expected_start,
+                        "Delay Minutes": delay_minutes,
+                        "Status": status,
+                        "Start Odometer (km)": start_km,
+                        "End Odometer (km)": "",
+                        "Distance (km)": "",
+                        "Start Location": maps_link(location),
+                        "End Location": "",
+                        "Start - Left Photo": start_left_url,
+                        "Start - Right Photo": start_right_url,
+                        "Start - Odometer Photo": start_odo_url,
+                        "End - Left Photo": "",
+                        "End - Right Photo": "",
+                        "End - Odometer Photo": "",
+                        "Submitted At": "",
+                    })
+            except Exception as e:
+                st.error(f"Failed to start trip: {e}")
+                return
+
             st.session_state["trip"] = {
-                "trip_id": trip_id(emp_id),
+                "trip_id": tid,
                 "driver_name": driver_name,
                 "emp_id": emp_id,
                 "client": client,
                 "vehicle_number": vehicle_number,
                 "date": today,
-                "start_time": datetime.now().strftime("%H:%M:%S"),
+                "start_time": start_time,
                 "start_km": start_km,
                 "start_location": maps_link(location),
-                "start_left": left.getvalue(),
-                "start_right": right.getvalue(),
-                "start_odo": odo.getvalue(),
                 "expected_start_time": expected_start,
+                "delay_minutes": delay_minutes,
+                "status": status,
             }
             st.session_state["phase"] = "end"
             st.rerun()
@@ -163,38 +204,20 @@ def show_end_form():
                 creds = get_credentials()
                 end_time = datetime.now().strftime("%H:%M:%S")
                 distance = end_km - trip["start_km"]
-                delay_minutes = calculate_delay(trip["start_time"], trip.get("expected_start_time", ""))
-                status = "On Time" if delay_minutes == 0 else "Delayed"
 
                 def upload(data, name):
                     return upload_image(data, f"{trip['trip_id']}_{name}.jpg")
 
-                row = {
-                    "Trip ID": trip["trip_id"],
-                    "Driver Name": trip["driver_name"],
-                    "Employee ID": trip["emp_id"],
-                    "Client": trip["client"],
-                    "Vehicle Number": trip["vehicle_number"],
-                    "Date": trip["date"],
-                    "Start Time": trip["start_time"],
+                update_trip_end(creds, trip["trip_id"], {
                     "End Time": end_time,
-                    "Expected Start Time": trip.get("expected_start_time", ""),
-                    "Delay Minutes": delay_minutes,
-                    "Status": status,
-                    "Start Odometer (km)": trip["start_km"],
                     "End Odometer (km)": end_km,
                     "Distance (km)": distance,
-                    "Start Location": trip["start_location"],
                     "End Location": maps_link(location),
-                    "Start - Left Photo": upload(trip["start_left"], "start_left"),
-                    "Start - Right Photo": upload(trip["start_right"], "start_right"),
-                    "Start - Odometer Photo": upload(trip["start_odo"], "start_odo"),
                     "End - Left Photo": upload(left.getvalue(), "end_left"),
                     "End - Right Photo": upload(right.getvalue(), "end_right"),
                     "End - Odometer Photo": upload(odo.getvalue(), "end_odo"),
                     "Submitted At": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                }
-                append_trip(creds, row)
+                })
         except Exception as e:
             st.error(f"Failed to save trip: {e}")
             return
