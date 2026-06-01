@@ -1,7 +1,10 @@
 import base64
 import streamlit as st
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from streamlit_js_eval import get_geolocation
+
+IST = ZoneInfo("Asia/Kolkata")
 
 from auth import get_credentials
 from storage import upload_image
@@ -36,7 +39,7 @@ def init_state():
 
 
 def trip_id(emp_id: str) -> str:
-    return f"{emp_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    return f"{emp_id}_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}"
 
 
 def camera_block(label: str, key: str):
@@ -56,7 +59,7 @@ def show_start_form():
     show_header()
     st.subheader("Start Trip")
 
-    location = get_geolocation()
+    location = get_geolocation(component_key="geo_start")
     if location:
         st.session_state["location_start"] = location
     if st.session_state.get("location_start"):
@@ -67,7 +70,7 @@ def show_start_form():
     drivers = get_drivers()
     driver_name = st.selectbox("Driver Name", list(drivers.keys()))
     emp_id = drivers[driver_name]
-    st.caption(f"Employee ID: **{emp_id}**  |  Date: **{datetime.today().strftime('%d %b %Y')}**")
+    st.caption(f"Employee ID: **{emp_id}**  |  Date: **{datetime.now(IST).strftime('%d %b %Y')}**")
 
     clients = get_clients()
     vehicles = get_vehicles()
@@ -95,8 +98,8 @@ def show_start_form():
             try:
                 with st.spinner("Starting trip..."):
                     creds = get_credentials()
-                    today = datetime.today().strftime("%Y-%m-%d")
-                    start_time = datetime.now().strftime("%H:%M:%S")
+                    today = datetime.now(IST).strftime("%Y-%m-%d")
+                    start_time = datetime.now(IST).strftime("%H:%M:%S")
                     tid = trip_id(emp_id)
 
                     roster = get_roster_entry(creds, emp_id, today)
@@ -164,7 +167,7 @@ def show_end_form():
         f"Started at **{trip['start_time']}** | Start KM: **{trip['start_km']}**"
     )
 
-    location = get_geolocation()
+    location = get_geolocation(component_key="geo_end")
     if location:
         st.session_state["location_end"] = location
     if st.session_state.get("location_end"):
@@ -209,7 +212,7 @@ def show_end_form():
         try:
             with st.spinner("Uploading photos and saving trip..."):
                 creds = get_credentials()
-                end_time = datetime.now().strftime("%H:%M:%S")
+                end_time = datetime.now(IST).strftime("%H:%M:%S")
                 distance = end_km - trip["start_km"]
 
                 def upload(data, name):
@@ -223,7 +226,7 @@ def show_end_form():
                     "End - Left Photo": upload(left.getvalue(), "end_left"),
                     "End - Right Photo": upload(right.getvalue(), "end_right"),
                     "End - Odometer Photo": upload(odo.getvalue(), "end_odo"),
-                    "Submitted At": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Submitted At": datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S"),
                 })
         except Exception as e:
             st.error(f"Failed to save trip: {e}")

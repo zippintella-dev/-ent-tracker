@@ -1,5 +1,8 @@
 import time
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+IST = ZoneInfo("Asia/Kolkata")
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -79,8 +82,8 @@ def send_alert(driver_name: str, emp_id: str, expected_start: str, current_time:
 
 def run_monitor():
     creds = get_credentials()
-    today = datetime.today().strftime("%Y-%m-%d")
-    now = datetime.now()
+    today = datetime.now(IST).strftime("%Y-%m-%d")
+    now = datetime.now(IST)
     now_str = now.strftime("%H:%M:%S")
 
     client = gspread.authorize(creds)
