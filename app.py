@@ -2,6 +2,8 @@ import base64
 import streamlit as st
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from streamlit_geolocation import streamlit_geolocation
+
 IST = ZoneInfo("Asia/Kolkata")
 
 from auth import get_credentials
@@ -32,6 +34,14 @@ def init_state():
     st.session_state.setdefault("phase", "start")
     st.session_state.setdefault("trip", {})
     st.session_state.setdefault("last_trip", {})
+    st.session_state.setdefault("location_start", None)
+    st.session_state.setdefault("location_end", None)
+
+
+def maps_link(loc) -> str:
+    if not loc or loc.get("latitude") is None:
+        return "Not available"
+    return f"https://maps.google.com/?q={loc['latitude']},{loc['longitude']}"
 
 
 def trip_id(emp_id: str) -> str:
@@ -64,7 +74,14 @@ def show_start_form():
 
     st.divider()
     start_km = st.number_input("Start Odometer (km)", min_value=0, step=1, format="%d")
-    start_location = st.text_input("Start Location", placeholder="e.g. Electronic City, Bangalore")
+
+    loc = streamlit_geolocation(key="geo_start")
+    if loc and loc.get("latitude") is not None:
+        st.session_state["location_start"] = loc
+    if st.session_state.get("location_start"):
+        st.caption("📍 Location captured")
+    else:
+        st.caption("📍 Press the button above to capture your location")
 
     st.divider()
     st.subheader("📸 Start Photos")
@@ -77,6 +94,8 @@ def show_start_form():
         missing = [n for n, f in [("Left side", left), ("Right side", right), ("Odometer", odo)] if not f]
         if missing:
             st.warning(f"Please capture: {', '.join(missing)}")
+        elif not st.session_state.get("location_start"):
+            st.warning("Please capture your location first.")
         else:
             try:
                 with st.spinner("Starting trip..."):
@@ -109,7 +128,7 @@ def show_start_form():
                         "Start Odometer (km)": start_km,
                         "End Odometer (km)": "",
                         "Distance (km)": "",
-                        "Start Location": start_location,
+                        "Start Location": maps_link(st.session_state.get("location_start")),
                         "End Location": "",
                         "Start - Left Photo": start_left_url,
                         "Start - Right Photo": start_right_url,
@@ -132,7 +151,7 @@ def show_start_form():
                 "date": today,
                 "start_time": start_time,
                 "start_km": start_km,
-                "start_location": start_location,
+                "start_location": maps_link(st.session_state.get("location_start")),
                 "expected_start_time": expected_start,
                 "delay_minutes": delay_minutes,
                 "status": status,
@@ -152,7 +171,14 @@ def show_end_form():
 
     st.subheader("End Trip")
     end_km = st.number_input("End Odometer (km)", min_value=0, step=1, format="%d")
-    end_location = st.text_input("End Location", placeholder="e.g. Whitefield, Bangalore")
+
+    loc = streamlit_geolocation(key="geo_end")
+    if loc and loc.get("latitude") is not None:
+        st.session_state["location_end"] = loc
+    if st.session_state.get("location_end"):
+        st.caption("📍 Location captured")
+    else:
+        st.caption("📍 Press the button above to capture your location")
 
     st.divider()
     st.subheader("📸 End Photos")
@@ -171,12 +197,16 @@ def show_end_form():
     if cancel:
         st.session_state["phase"] = "start"
         st.session_state["trip"] = {}
+        st.session_state["location_end"] = None
         st.rerun()
 
     if submit:
         missing = [n for n, f in [("Left side", left), ("Right side", right), ("Odometer", odo)] if not f]
         if missing:
             st.warning(f"Please capture: {', '.join(missing)}")
+            return
+        if not st.session_state.get("location_end"):
+            st.warning("Please capture your location first.")
             return
         if end_km <= trip["start_km"]:
             st.warning("End odometer must be greater than start odometer.")
@@ -197,7 +227,7 @@ def show_end_form():
                     "End Time": end_time,
                     "End Odometer (km)": end_km,
                     "Distance (km)": distance,
-                    "End Location": end_location,
+                    "End Location": maps_link(st.session_state.get("location_end")),
                     "End - Left Photo": upload(left.getvalue(), "end_left"),
                     "End - Right Photo": upload(right.getvalue(), "end_right"),
                     "End - Odometer Photo": upload(odo.getvalue(), "end_odo"),
@@ -236,6 +266,8 @@ def show_saved_screen():
     if st.button("▶  Start Next Trip", use_container_width=True, type="primary"):
         st.session_state["phase"] = "start"
         st.session_state["last_trip"] = {}
+        st.session_state["location_start"] = None
+        st.session_state["location_end"] = None
         st.rerun()
 
 
