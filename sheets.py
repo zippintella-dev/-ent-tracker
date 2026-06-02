@@ -94,17 +94,32 @@ def write_daily_roster(creds, date_str: str, rows: list[dict]):
     ]
     for row_number in reversed(to_delete):
         sheet.delete_rows(row_number)
-    if rows:
-        sheet.append_rows(
-            [[row.get(col, "") for col in ROSTER_COLUMNS] for row in rows],
-            value_input_option="RAW",
-        )
+    if not rows:
+        return
+    # Re-read after deletions to get the true last row, then write at an
+    # explicit range — avoids append_rows OVERWRITE mode ambiguity.
+    last_row = len(sheet.get_all_values())
+    next_row = max(last_row + 1, 2)
+    values = [[row.get(col, "") for col in ROSTER_COLUMNS] for row in rows]
+    sheet.update(f"A{next_row}", values, value_input_option="RAW")
 
 
 def add_daily_entry(creds, row: dict):
     sheet = _open_daily(creds)
-    sheet.append_row(
-        [row.get(col, "") for col in ROSTER_COLUMNS],
+    last_row = len(sheet.get_all_values())
+    next_row = max(last_row + 1, 2)
+    sheet.update(
+        f"A{next_row}",
+        [[row.get(col, "") for col in ROSTER_COLUMNS]],
+        value_input_option="RAW",
+    )
+
+
+def update_daily_entry(creds, row_number: int, row: dict):
+    sheet = _open_daily(creds)
+    sheet.update(
+        f"A{row_number}",
+        [[row.get(col, "") for col in ROSTER_COLUMNS]],
         value_input_option="RAW",
     )
 

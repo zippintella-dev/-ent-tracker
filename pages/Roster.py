@@ -7,7 +7,7 @@ from auth import get_credentials
 from db import get_drivers
 from sheets import (
     get_master_roster, add_master_entry, update_master_entry, delete_master_entry,
-    get_daily_roster, write_daily_roster, add_daily_entry, delete_daily_entry,
+    get_daily_roster, write_daily_roster, add_daily_entry, update_daily_entry, delete_daily_entry,
 )
 from config import MASTER_ROSTER_COLUMNS, ROSTER_COLUMNS
 
@@ -231,14 +231,12 @@ def show_daily_roster(creds, drivers):
 
     existing = get_daily_roster(creds, date_str)
 
-    col_gen, col_info = st.columns([2, 3])
-    with col_gen:
-        if st.button("⚡ Generate from Master", use_container_width=True, type="primary"):
-            if existing:
-                st.session_state["confirm_overwrite"] = date_str
-            else:
-                _do_generate(creds, date_str, day_name)
-                st.rerun()
+    if st.button("⚡ Generate from Master", use_container_width=True, type="primary"):
+        if existing:
+            st.session_state["confirm_overwrite"] = date_str
+        else:
+            _do_generate(creds, date_str, day_name)
+            st.rerun()
 
     if st.session_state.get("confirm_overwrite") == date_str:
         st.warning(f"{len(existing)} entries already exist for {date_str}. Overwrite?")
@@ -253,9 +251,26 @@ def show_daily_roster(creds, drivers):
 
     st.subheader(f"Roster for {date_str}")
 
+    editing_daily = st.session_state.get("daily_edit_row")
+    if editing_daily and editing_daily.get("Date") == date_str:
+        st.info(
+            f"Editing: **{editing_daily.get('Client Employee Name')}** (RT {editing_daily.get('RT No')})"
+        )
+        result = _entry_form("edit_daily_form", drivers, prefill=editing_daily)
+        if result:
+            result["Date"] = date_str
+            update_daily_entry(creds, editing_daily["_row"], result)
+            st.session_state.pop("daily_edit_row", None)
+            st.success("Entry updated.")
+            st.rerun()
+        if st.button("Cancel Edit", key="cancel_daily_edit"):
+            st.session_state.pop("daily_edit_row", None)
+            st.rerun()
+        st.divider()
+
     existing = get_daily_roster(creds, date_str)
     if not existing:
-        st.info("No entries yet. Generate from master or add manually below.")
+        st.info("No entries yet. Generate from master or add one below.")
     else:
         for row in existing:
             col1, col2, col3, col4, col5 = st.columns([1, 3, 2, 2, 1])
@@ -263,13 +278,17 @@ def show_daily_roster(creds, drivers):
             col2.write(row.get("Client Employee Name", ""))
             col3.write(f"↑ {row.get('Login Time', '')}  {row.get('Login Driver Name', '')}")
             col4.write(f"↓ {row.get('Logout Time', '')}  {row.get('Logout Driver Name', '')}")
-            if col5.button("🗑️", key=f"del_d_{row['_row']}"):
+            btn1, btn2 = col5.columns(2)
+            if btn1.button("✏️", key=f"edit_d_{row['_row']}"):
+                st.session_state["daily_edit_row"] = row
+                st.rerun()
+            if btn2.button("🗑️", key=f"del_d_{row['_row']}"):
                 delete_daily_entry(creds, row["_row"])
                 st.rerun()
 
     st.divider()
 
-    with st.expander("➕ Add / Override Entry for This Date"):
+    with st.expander("➕ Add Entry"):
         result = _entry_form("add_daily_form", drivers)
         if result:
             result["Date"] = date_str
