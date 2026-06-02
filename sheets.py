@@ -96,10 +96,9 @@ def write_daily_roster(creds, date_str: str, rows: list[dict]):
         sheet.delete_rows(row_number)
     if not rows:
         return
-    # Re-read after deletions to get the true last row, then write at an
-    # explicit range — avoids append_rows OVERWRITE mode ambiguity.
-    last_row = len(sheet.get_all_values())
-    next_row = max(last_row + 1, 2)
+    # Calculate next row from the initial read minus deleted rows — avoids
+    # a second get_all_values() API call.
+    next_row = max(len(all_rows) - len(to_delete) + 1, 2)
     values = [[row.get(col, "") for col in ROSTER_COLUMNS] for row in rows]
     sheet.update(f"A{next_row}", values, value_input_option="RAW")
 

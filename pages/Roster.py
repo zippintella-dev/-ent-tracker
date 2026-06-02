@@ -13,6 +13,18 @@ from config import MASTER_ROSTER_COLUMNS, ROSTER_COLUMNS
 
 IST = ZoneInfo("Asia/Kolkata")
 
+
+# Cached wrappers — _creds is prefixed with _ so Streamlit skips hashing it.
+# Cache is explicitly cleared after every write so reads stay fresh.
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_master_roster(_creds):
+    return get_master_roster(_creds)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_daily_roster(_creds, date_str: str):
+    return get_daily_roster(_creds, date_str)
+
 EXCEL_COLUMN_MAP = {
     "Emp name": "Client Employee Name",
     "Location": "Location",
@@ -127,6 +139,7 @@ def show_master_roster(creds, drivers):
         result = _entry_form("edit_master_form", drivers, prefill=editing)
         if result:
             update_master_entry(creds, editing["_row"], result)
+            _cached_master_roster.clear()
             st.session_state.pop("master_edit_row", None)
             st.success("Entry updated.")
             st.rerun()
@@ -138,12 +151,13 @@ def show_master_roster(creds, drivers):
             result = _entry_form("add_master_form", drivers)
             if result:
                 add_master_entry(creds, result)
+                _cached_master_roster.clear()
                 st.success(f"Added {result['Client Employee Name']}.")
                 st.rerun()
 
     st.divider()
 
-    rows = get_master_roster(creds)
+    rows = _cached_master_roster(creds)
     if not rows:
         st.info("No entries yet. Add one above or upload from Excel.")
     else:
@@ -159,6 +173,7 @@ def show_master_roster(creds, drivers):
                 st.rerun()
             if btn_col2.button("🗑️", key=f"del_m_{row['_row']}"):
                 delete_master_entry(creds, row["_row"])
+                _cached_master_roster.clear()
                 st.rerun()
 
     st.divider()
@@ -203,13 +218,13 @@ def show_master_roster(creds, drivers):
                 imported = 0
                 for _, r in df.iterrows():
                     row_dict = {col: str(r.get(col, "")) for col in MASTER_ROSTER_COLUMNS}
-                    # Auto-fill Employee IDs from driver name if found
                     login_name = row_dict.get("Login Driver Name", "")
                     row_dict["Login Driver Employee ID"] = drivers.get(login_name, "")
                     logout_name = row_dict.get("Logout Driver Name", "")
                     row_dict["Logout Driver Employee ID"] = drivers.get(logout_name, "")
                     add_master_entry(creds, row_dict)
                     imported += 1
+                _cached_master_roster.clear()
                 st.success(f"Imported {imported} entries.")
                 st.rerun()
 
@@ -229,7 +244,7 @@ def show_daily_roster(creds, drivers):
 
     st.divider()
 
-    existing = get_daily_roster(creds, date_str)
+    existing = _cached_daily_roster(creds, date_str)
 
     if st.button("⚡ Generate from Master", use_container_width=True, type="primary"):
         if existing:
@@ -260,6 +275,7 @@ def show_daily_roster(creds, drivers):
         if result:
             result["Date"] = date_str
             update_daily_entry(creds, editing_daily["_row"], result)
+            _cached_daily_roster.clear()
             st.session_state.pop("daily_edit_row", None)
             st.success("Entry updated.")
             st.rerun()
@@ -268,7 +284,7 @@ def show_daily_roster(creds, drivers):
             st.rerun()
         st.divider()
 
-    existing = get_daily_roster(creds, date_str)
+    existing = _cached_daily_roster(creds, date_str)
     if not existing:
         st.info("No entries yet. Generate from master or add one below.")
     else:
@@ -284,6 +300,7 @@ def show_daily_roster(creds, drivers):
                 st.rerun()
             if btn2.button("🗑️", key=f"del_d_{row['_row']}"):
                 delete_daily_entry(creds, row["_row"])
+                _cached_daily_roster.clear()
                 st.rerun()
 
     st.divider()
@@ -293,12 +310,13 @@ def show_daily_roster(creds, drivers):
         if result:
             result["Date"] = date_str
             add_daily_entry(creds, result)
+            _cached_daily_roster.clear()
             st.success(f"Added {result['Client Employee Name']} to {date_str} roster.")
             st.rerun()
 
 
 def _do_generate(creds, date_str: str, day_name: str):
-    master = get_master_roster(creds)
+    master = _cached_master_roster(creds)
     rows = []
     skipped = 0
     for entry in master:
@@ -309,6 +327,7 @@ def _do_generate(creds, date_str: str, day_name: str):
         row["Date"] = date_str
         rows.append(row)
     write_daily_roster(creds, date_str, rows)
+    _cached_daily_roster.clear()
     msg = f"Generated {len(rows)} entries for {date_str}."
     if skipped:
         msg += f" Skipped {skipped} on week off."
