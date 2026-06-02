@@ -40,7 +40,7 @@ def add_master_entry(creds, row: dict):
     sheet = _open_master(creds)
     sheet.append_row(
         [row.get(col, "") for col in MASTER_ROSTER_COLUMNS],
-        value_input_option="USER_ENTERED",
+        value_input_option="RAW",
     )
 
 
@@ -49,7 +49,7 @@ def update_master_entry(creds, row_number: int, row: dict):
     sheet.update(
         f"A{row_number}",
         [[row.get(col, "") for col in MASTER_ROSTER_COLUMNS]],
-        value_input_option="USER_ENTERED",
+        value_input_option="RAW",
     )
 
 
@@ -63,12 +63,22 @@ def _open_daily(creds):
     return gspread.authorize(creds).open_by_key(SHEET_ID).worksheet(ROSTER_SHEET_NAME)
 
 
+def _normalize_date(value: str) -> str:
+    from datetime import datetime
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(str(value).strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return str(value).strip()
+
+
 def get_daily_roster(creds, date_str: str) -> list[dict]:
     sheet = _open_daily(creds)
     rows = sheet.get_all_records()
     result = []
     for i, row in enumerate(rows):
-        if str(row.get("Date", "")) == date_str:
+        if _normalize_date(str(row.get("Date", ""))) == date_str:
             row["_row"] = i + 2
             result.append(row)
     return result
@@ -77,18 +87,17 @@ def get_daily_roster(creds, date_str: str) -> list[dict]:
 def write_daily_roster(creds, date_str: str, rows: list[dict]):
     sheet = _open_daily(creds)
     all_rows = sheet.get_all_values()
-    # Collect 1-based row indices (skip header at index 0) that match the date
     to_delete = [
         i + 2
         for i, r in enumerate(all_rows[1:])
-        if r and r[0] == date_str
+        if r and _normalize_date(r[0]) == date_str
     ]
     for row_number in reversed(to_delete):
         sheet.delete_rows(row_number)
-    for row in rows:
-        sheet.append_row(
-            [row.get(col, "") for col in ROSTER_COLUMNS],
-            value_input_option="USER_ENTERED",
+    if rows:
+        sheet.append_rows(
+            [[row.get(col, "") for col in ROSTER_COLUMNS] for row in rows],
+            value_input_option="RAW",
         )
 
 
@@ -96,7 +105,7 @@ def add_daily_entry(creds, row: dict):
     sheet = _open_daily(creds)
     sheet.append_row(
         [row.get(col, "") for col in ROSTER_COLUMNS],
-        value_input_option="USER_ENTERED",
+        value_input_option="RAW",
     )
 
 
