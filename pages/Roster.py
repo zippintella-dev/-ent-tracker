@@ -20,9 +20,18 @@ EXCEL_COLUMN_MAP = {
     "Week Offs": "Week Offs",
     "RT No": "RT No",
     "Login": "Login Time",
+    "Login Driver": "Login Driver Name",
     "Logout": "Logout Time",
+    "Logout Driver": "Logout Driver Name",
     "Report time": "Report Time",
 }
+
+SAMPLE_CSV = """\
+RT No,Emp name,Location,Mobile,Week Offs,Report Time,Login,Login Driver,Logout,Logout Driver
+RT-01,Ravi Kumar,MG Road - Gate 2,9876543210,Sunday,08:45,09:00,Ramesh Kumar,18:30,Suresh Patel
+RT-02,Priya Nair,Whitefield Office,9876543211,Wednesday,08:30,08:45,Mahesh Singh,18:00,Dinesh Rao
+RT-03,Arjun Mehta,Electronic City,9876543212,Sunday,08:00,08:15,Ramesh Kumar,17:30,Mahesh Singh
+"""
 
 
 def check_password() -> bool:
@@ -155,8 +164,19 @@ def show_master_roster(creds, drivers):
     st.divider()
 
     with st.expander("📂 Upload from Excel / CSV"):
+        st.download_button(
+            "⬇️ Download sample CSV",
+            data=SAMPLE_CSV,
+            file_name="roster_sample.csv",
+            mime="text/csv",
+        )
+        st.caption(
+            "Columns: RT No · Emp name · Location · Mobile · Week Offs · "
+            "Report Time · Login · Login Driver · Logout · Logout Driver"
+        )
+        st.divider()
         uploaded = st.file_uploader(
-            "Upload your existing roster Excel or CSV",
+            "Upload your roster Excel or CSV",
             type=["xlsx", "xls", "csv"],
             key="master_upload",
         )
@@ -169,10 +189,11 @@ def show_master_roster(creds, drivers):
             # Rename columns from old Excel format
             df = df.rename(columns=EXCEL_COLUMN_MAP)
 
-            # Handle duplicate "Driver" columns that pandas renames to Driver / Driver.1
-            if "Driver" in df.columns:
+            # Handle old Excel files with two duplicate "Driver" columns
+            # (pandas auto-renames the second one to "Driver.1")
+            if "Driver" in df.columns and "Login Driver Name" not in df.columns:
                 df = df.rename(columns={"Driver": "Login Driver Name"})
-            if "Driver.1" in df.columns:
+            if "Driver.1" in df.columns and "Logout Driver Name" not in df.columns:
                 df = df.rename(columns={"Driver.1": "Logout Driver Name"})
 
             display_cols = [c for c in MASTER_ROSTER_COLUMNS if c in df.columns]
