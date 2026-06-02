@@ -35,6 +35,58 @@ def get_roster_entry(creds, emp_id: str, date_str: str) -> dict | None:
     return None
 
 
+def get_shift_expected_time(creds, emp_id: str, date_str: str, current_time_str: str) -> str:
+    """
+    Return the expected start time for whichever shift (login or logout) is
+    closest to current_time_str. Uses circular 24h arithmetic so overnight
+    shifts (e.g. 21:30 login, 06:30 logout) resolve correctly.
+    """
+    def to_minutes(t: str) -> int | None:
+        try:
+            parts = t.strip().split(":")
+            return int(parts[0]) * 60 + int(parts[1])
+        except (ValueError, IndexError, AttributeError):
+            return None
+
+    def circular_diff(a: int, b: int) -> int:
+        d = abs(a - b)
+        return min(d, 1440 - d)
+
+    try:
+        h, m, s = current_time_str.split(":")
+        now_min = int(h) * 60 + int(m)
+    except (ValueError, AttributeError):
+        return ""
+
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(SHEET_ID).worksheet(ROSTER_SHEET_NAME)
+
+    best_time = ""
+    best_diff = float("inf")
+
+    for row in sheet.get_all_records():
+        if _normalize_date(str(row.get("Date", ""))) != date_str:
+            continue
+
+        if str(row.get("Login Driver Employee ID", "")) == str(emp_id):
+            t = to_minutes(str(row.get("Login Time", "")))
+            if t is not None:
+                diff = circular_diff(now_min, t)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_time = str(row.get("Login Time", "")).strip()
+
+        if str(row.get("Logout Driver Employee ID", "")) == str(emp_id):
+            t = to_minutes(str(row.get("Logout Time", "")))
+            if t is not None:
+                diff = circular_diff(now_min, t)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_time = str(row.get("Logout Time", "")).strip()
+
+    return best_time
+
+
 def calculate_delay(actual_start: str, expected_start: str) -> int:
     if not expected_start or not actual_start:
         return 0

@@ -10,7 +10,7 @@ from auth import get_credentials
 from storage import upload_image
 from sheets import append_trip, update_trip_end
 from db import get_drivers, get_clients, get_vehicles
-from alert_monitor import get_roster_entry, calculate_delay
+from alert_monitor import get_shift_expected_time, calculate_delay
 
 
 @st.cache_data
@@ -104,8 +104,7 @@ def show_start_form():
                     start_time = datetime.now(IST).strftime("%H:%M:%S")
                     tid = trip_id(emp_id)
 
-                    roster = get_roster_entry(creds, emp_id, today)
-                    expected_start = roster.get("Login Time", "") if roster else ""
+                    expected_start = get_shift_expected_time(creds, emp_id, today, start_time)
                     delay_minutes = calculate_delay(start_time, expected_start)
                     status = "On Time" if delay_minutes == 0 else "Delayed"
 
