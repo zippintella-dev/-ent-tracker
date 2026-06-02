@@ -105,7 +105,7 @@ def show_start_form():
                     tid = trip_id(emp_id)
 
                     roster = get_roster_entry(creds, emp_id, today)
-                    expected_start = roster["Expected Start Time"] if roster else ""
+                    expected_start = roster.get("Login Time", "") if roster else ""
                     delay_minutes = calculate_delay(start_time, expected_start)
                     status = "On Time" if delay_minutes == 0 else "Delayed"
 

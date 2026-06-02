@@ -8,7 +8,20 @@ DRIVERS = {
 SHEET_ID = "19Vuv9ZJsWsNBE0iM1JpRl-ADH7X84INVTUrLE75aR3Q"
 SHEET_NAME = "Sheet1"
 ROSTER_SHEET_NAME = "Daily Roster"
+MASTER_ROSTER_SHEET_NAME = "Master Roster"
 ALERT_LOG_SHEET_NAME = "Alert Log"
+
+ROSTER_COLUMNS = [
+    "Date", "RT No", "Client Employee Name", "Location", "Mobile", "Week Offs",
+    "Report Time", "Login Time", "Login Driver Name", "Login Driver Employee ID",
+    "Logout Time", "Logout Driver Name", "Logout Driver Employee ID",
+]
+
+MASTER_ROSTER_COLUMNS = [
+    "RT No", "Client Employee Name", "Location", "Mobile", "Week Offs",
+    "Report Time", "Login Time", "Login Driver Name", "Login Driver Employee ID",
+    "Logout Time", "Logout Driver Name", "Logout Driver Employee ID",
+]
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
