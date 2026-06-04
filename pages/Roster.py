@@ -4,7 +4,8 @@ from datetime import date
 from zoneinfo import ZoneInfo
 
 from auth import get_credentials
-from db import get_drivers
+from db import get_drivers, get_driver_chat_ids
+from telegram_bot import send_shift_message
 from sheets import (
     get_master_roster, add_master_entry, add_master_entries_batch,
     update_master_entry, delete_master_entry,
@@ -304,6 +305,10 @@ def show_daily_roster(creds, drivers):
                 _cached_daily_roster.clear()
                 st.rerun()
 
+        st.divider()
+        if st.button("📱 Send to Drivers", use_container_width=True):
+            _send_roster_to_drivers(existing, date_str, drivers)
+
     st.divider()
 
     with st.expander("➕ Add Entry"):
@@ -314,6 +319,63 @@ def show_daily_roster(creds, drivers):
             _cached_daily_roster.clear()
             st.success(f"Added {result['Client Employee Name']} to {date_str} roster.")
             st.rerun()
+
+
+def _build_message(driver_name: str, date_str: str, rows: list[dict]) -> str:
+    from datetime import datetime
+    try:
+        date_fmt = datetime.strptime(date_str, "%Y-%m-%d").strftime("%d %b %Y")
+    except ValueError:
+        date_fmt = date_str
+
+    routes = ", ".join(dict.fromkeys(r.get("RT No", "") for r in rows if r.get("RT No")))
+    login_time = rows[0].get("Login Time", "") if rows else ""
+
+    lines = []
+    for i, r in enumerate(rows, 1):
+        emp = r.get("Client Employee Name", "")
+        loc = r.get("Location", "")
+        report = r.get("Report Time", "")
+        line = f"{i}. {emp} - {loc}"
+        if report:
+            line += f" | Report: {report}"
+        lines.append(line)
+
+    passengers = "\n".join(lines)
+    return (
+        f"📋 *Shift Details — {date_fmt}*\n\n"
+        f"*{driver_name}* | Route: {routes} | Login: {login_time}\n\n"
+        f"Passengers:\n{passengers}\n\n"
+        f"Drive safe! 🚗\n— Zippi Team"
+    )
+
+
+def _send_roster_to_drivers(roster_rows: list[dict], date_str: str, drivers: dict):
+    chat_ids = get_driver_chat_ids()
+
+    # Group by Login Driver Name (preserves RT order)
+    groups: dict[str, list[dict]] = {}
+    for row in roster_rows:
+        driver = row.get("Login Driver Name", "").strip()
+        if driver:
+            groups.setdefault(driver, []).append(row)
+
+    results = []
+    for driver_name, rows in groups.items():
+        emp_id = drivers.get(driver_name, "")
+        chat_id = chat_ids.get(emp_id, "").strip()
+        if not chat_id:
+            results.append(f"⚠️ **{driver_name}** — No Telegram chat ID on file")
+            continue
+        msg = _build_message(driver_name, date_str, rows)
+        ok, err = send_shift_message(chat_id, msg)
+        if ok:
+            results.append(f"✅ **{driver_name}** — Sent")
+        else:
+            results.append(f"❌ **{driver_name}** — {err}")
+
+    for line in results:
+        st.markdown(line)
 
 
 def _do_generate(creds, date_str: str, day_name: str):

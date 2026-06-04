@@ -1,6 +1,6 @@
 import streamlit as st
 from db import (
-    get_drivers, add_driver, remove_driver,
+    get_drivers, add_driver, remove_driver, update_driver_chat_id,
     get_clients, add_client, remove_client,
     get_vehicles, add_vehicle, remove_vehicle,
 )
@@ -27,12 +27,13 @@ def show_drivers():
         col1, col2 = st.columns(2)
         name = col1.text_input("Full Name")
         emp_id = col2.text_input("Employee ID")
+        chat_id = st.text_input("Telegram Chat ID (optional — add later via Edit)")
         if st.form_submit_button("Add Driver", use_container_width=True, type="primary"):
             if not name or not emp_id:
                 st.warning("Both fields are required.")
             else:
                 try:
-                    add_driver(name.strip(), emp_id.strip().upper())
+                    add_driver(name.strip(), emp_id.strip().upper(), chat_id.strip())
                     st.success(f"Added {name}")
                     st.rerun()
                 except Exception as e:
@@ -44,15 +45,42 @@ def show_drivers():
                     else:
                         st.error(f"Failed to add driver: {e}")
 
+    # Inline chat ID editor
+    editing = st.session_state.get("edit_chatid_emp_id")
+    if editing:
+        st.info(f"Editing Telegram Chat ID for **{editing}**")
+        with st.form("edit_chatid_form"):
+            new_chat_id = st.text_input("Telegram Chat ID", value=st.session_state.get("edit_chatid_current", ""))
+            c1, c2 = st.columns(2)
+            if c1.form_submit_button("Save", type="primary"):
+                update_driver_chat_id(editing, new_chat_id.strip())
+                st.session_state.pop("edit_chatid_emp_id", None)
+                st.session_state.pop("edit_chatid_current", None)
+                st.success("Chat ID updated.")
+                st.rerun()
+            if c2.form_submit_button("Cancel"):
+                st.session_state.pop("edit_chatid_emp_id", None)
+                st.session_state.pop("edit_chatid_current", None)
+                st.rerun()
+
     drivers = get_drivers()
     if not drivers:
         st.info("No drivers yet.")
         return
+
+    from db import get_driver_chat_ids
+    chat_ids = get_driver_chat_ids()
+
     for name, emp_id in drivers.items():
-        col1, col2, col3 = st.columns([4, 2, 1])
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
         col1.write(name)
         col2.write(emp_id)
-        if col3.button("Remove", key=f"drv_{emp_id}"):
+        col3.write(chat_ids.get(emp_id, "") or "—")
+        if col4.button("✏️", key=f"edit_cid_{emp_id}", help="Edit Telegram Chat ID"):
+            st.session_state["edit_chatid_emp_id"] = emp_id
+            st.session_state["edit_chatid_current"] = chat_ids.get(emp_id, "")
+            st.rerun()
+        if col5.button("🗑️", key=f"drv_{emp_id}"):
             remove_driver(emp_id)
             st.rerun()
 

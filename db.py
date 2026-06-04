@@ -16,14 +16,27 @@ def get_drivers() -> dict:
     return {row["name"]: row["emp_id"] for row in rows.data}
 
 
-def add_driver(name: str, emp_id: str):
-    _get_client().table("drivers").insert({"name": name, "emp_id": emp_id}).execute()
+def add_driver(name: str, emp_id: str, telegram_chat_id: str = ""):
+    _get_client().table("drivers").insert(
+        {"name": name, "emp_id": emp_id, "telegram_chat_id": telegram_chat_id}
+    ).execute()
     get_drivers.clear()
 
 
 def remove_driver(emp_id: str):
     _get_client().table("drivers").update({"active": False}).eq("emp_id", emp_id).execute()
     get_drivers.clear()
+
+
+@st.cache_data(ttl=60)
+def get_driver_chat_ids() -> dict:
+    rows = _get_client().table("drivers").select("emp_id, telegram_chat_id").eq("active", True).execute()
+    return {row["emp_id"]: row.get("telegram_chat_id", "") or "" for row in rows.data}
+
+
+def update_driver_chat_id(emp_id: str, chat_id: str):
+    _get_client().table("drivers").update({"telegram_chat_id": chat_id}).eq("emp_id", emp_id).execute()
+    get_driver_chat_ids.clear()
 
 
 @st.cache_data(ttl=60)
