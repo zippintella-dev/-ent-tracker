@@ -35,11 +35,11 @@ def get_roster_entry(creds, emp_id: str, date_str: str) -> dict | None:
     return None
 
 
-def get_shift_expected_time(creds, emp_id: str, date_str: str, current_time_str: str) -> str:
+def _compute_shift_expected_time(roster_rows: list, emp_id: str, date_str: str, current_time_str: str) -> str:
     """
-    Return the expected start time for whichever shift (login or logout) is
-    closest to current_time_str. Uses circular 24h arithmetic so overnight
-    shifts (e.g. 21:30 login, 06:30 logout) resolve correctly.
+    From pre-fetched roster rows, return the expected start time for whichever
+    shift (login or logout) is closest to current_time_str.
+    Uses circular 24h arithmetic so overnight shifts resolve correctly.
     """
     def to_minutes(t: str) -> int | None:
         try:
@@ -58,13 +58,10 @@ def get_shift_expected_time(creds, emp_id: str, date_str: str, current_time_str:
     except (ValueError, AttributeError):
         return ""
 
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).worksheet(ROSTER_SHEET_NAME)
-
     best_time = ""
     best_diff = float("inf")
 
-    for row in sheet.get_all_records():
+    for row in roster_rows:
         if _normalize_date(str(row.get("Date", ""))) != date_str:
             continue
 
@@ -87,6 +84,13 @@ def get_shift_expected_time(creds, emp_id: str, date_str: str, current_time_str:
     return best_time
 
 
+def get_shift_expected_time(creds, emp_id: str, date_str: str, current_time_str: str) -> str:
+    """Fetch the daily roster then delegate to _compute_shift_expected_time."""
+    client = gspread.authorize(creds)
+    rows = client.open_by_key(SHEET_ID).worksheet(ROSTER_SHEET_NAME).get_all_records()
+    return _compute_shift_expected_time(rows, emp_id, date_str, current_time_str)
+
+
 def calculate_delay(actual_start: str, expected_start: str) -> int:
     if not expected_start or not actual_start:
         return 0
@@ -98,31 +102,6 @@ def calculate_delay(actual_start: str, expected_start: str) -> int:
         return max(0, int((actual - expected).total_seconds() / 60))
     except ValueError:
         return 0
-
-
-def check_missing_trip(creds, emp_id: str, date_str: str) -> bool:
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
-    trips = sheet.get_all_records()
-    return not any(
-        str(t.get("Employee ID")) == str(emp_id) and str(t.get("Date")) == date_str
-        for t in trips
-    )
-
-
-def alert_already_sent(creds, emp_id: str, date_str: str) -> bool:
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).worksheet(ALERT_LOG_SHEET_NAME)
-    return any(
-        str(r.get("Employee ID")) == str(emp_id) and str(r.get("Date")) == date_str
-        for r in sheet.get_all_records()
-    )
-
-
-def log_alert(creds, row: dict):
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).worksheet(ALERT_LOG_SHEET_NAME)
-    sheet.append_row(list(row.values()), value_input_option="USER_ENTERED")
 
 
 def send_alert(driver_name: str, emp_id: str, expected_start: str, current_time: str):
@@ -138,11 +117,25 @@ def run_monitor():
     now = datetime.now(IST)
     now_str = now.strftime("%H:%M:%S")
 
-    client = gspread.authorize(creds)
-    roster = client.open_by_key(SHEET_ID).worksheet(ROSTER_SHEET_NAME).get_all_records()
+    # Read all three sheets once — previously made 1 + 2N reads per run
+    spreadsheet = gspread.authorize(creds).open_by_key(SHEET_ID)
+    roster     = spreadsheet.worksheet(ROSTER_SHEET_NAME).get_all_records()
+    trips      = spreadsheet.worksheet(SHEET_NAME).get_all_records()
+    alerts_log = spreadsheet.worksheet(ALERT_LOG_SHEET_NAME).get_all_records()
+
+    started_keys = {
+        (str(t.get("Employee ID")), str(t.get("Date")))
+        for t in trips
+    }
+    alerted_keys = {
+        (str(a.get("Employee ID")), str(a.get("Date")))
+        for a in alerts_log
+    }
+
+    alert_sheet = spreadsheet.worksheet(ALERT_LOG_SHEET_NAME)
 
     for entry in roster:
-        if str(entry.get("Date")) != today:
+        if _normalize_date(str(entry.get("Date", ""))) != today:
             continue
 
         emp_id = str(entry.get("Login Driver Employee ID", "")).strip()
@@ -154,27 +147,30 @@ def run_monitor():
 
         normalized = expected_start if len(expected_start.split(":")) == 3 else expected_start + ":00"
         try:
-            threshold = datetime.strptime(f"{today} {normalized}", "%Y-%m-%d %H:%M:%S") + timedelta(minutes=15)
+            threshold = (
+                datetime.strptime(f"{today} {normalized}", "%Y-%m-%d %H:%M:%S")
+                + timedelta(minutes=15)
+            )
         except ValueError:
             continue
 
         if now < threshold:
             continue
-
-        if not check_missing_trip(creds, emp_id, today):
+        if (emp_id, today) in started_keys:
             continue
-
-        if alert_already_sent(creds, emp_id, today):
+        if (emp_id, today) in alerted_keys:
             continue
 
         send_alert(driver_name, emp_id, expected_start, now_str)
-        log_alert(creds, {
+        alert_row = {
             "Date": today,
             "Employee ID": emp_id,
             "Driver Name": driver_name,
             "Alert Time": now_str,
             "Reason": f"No trip started as of {now_str}; expected at {expected_start}",
-        })
+        }
+        alert_sheet.append_row(list(alert_row.values()), value_input_option="USER_ENTERED")
+        alerted_keys.add((emp_id, today))  # prevent double-alert within same run
 
 
 if __name__ == "__main__":
