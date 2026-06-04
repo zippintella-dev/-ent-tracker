@@ -31,9 +31,18 @@ def show_drivers():
             if not name or not emp_id:
                 st.warning("Both fields are required.")
             else:
-                add_driver(name.strip(), emp_id.strip().upper())
-                st.success(f"Added {name}")
-                st.rerun()
+                try:
+                    add_driver(name.strip(), emp_id.strip().upper())
+                    st.success(f"Added {name}")
+                    st.rerun()
+                except Exception as e:
+                    if "23505" in str(e) or "duplicate key" in str(e).lower():
+                        st.error(
+                            f"Employee ID **{emp_id.strip().upper()}** already exists in the system. "
+                            "Try a different Employee ID, or remove the existing record below before re-adding."
+                        )
+                    else:
+                        st.error(f"Failed to add driver: {e}")
 
     drivers = get_drivers()
     if not drivers:
