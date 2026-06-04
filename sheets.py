@@ -44,6 +44,13 @@ def add_master_entry(creds, row: dict):
     )
 
 
+def add_master_entries_batch(creds, rows: list[dict]):
+    """Write multiple master roster rows in a single API call."""
+    sheet = _open_master(creds)
+    values = [[row.get(col, "") for col in MASTER_ROSTER_COLUMNS] for row in rows]
+    sheet.append_rows(values, value_input_option="RAW")
+
+
 def update_master_entry(creds, row_number: int, row: dict):
     sheet = _open_master(creds)
     sheet.update(

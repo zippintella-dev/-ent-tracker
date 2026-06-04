@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 from auth import get_credentials
 from db import get_drivers
 from sheets import (
-    get_master_roster, add_master_entry, update_master_entry, delete_master_entry,
+    get_master_roster, add_master_entry, add_master_entries_batch,
+    update_master_entry, delete_master_entry,
     get_daily_roster, write_daily_roster, add_daily_entry, update_daily_entry, delete_daily_entry,
 )
 from config import MASTER_ROSTER_COLUMNS, ROSTER_COLUMNS
@@ -215,17 +216,17 @@ def show_master_roster(creds, drivers):
             st.dataframe(df[display_cols] if display_cols else df, use_container_width=True)
 
             if st.button(f"Import {len(df)} rows into Master Roster", type="primary"):
-                imported = 0
+                all_rows = []
                 for _, r in df.iterrows():
                     row_dict = {col: str(r.get(col, "")) for col in MASTER_ROSTER_COLUMNS}
                     login_name = row_dict.get("Login Driver Name", "")
                     row_dict["Login Driver Employee ID"] = drivers.get(login_name, "")
                     logout_name = row_dict.get("Logout Driver Name", "")
                     row_dict["Logout Driver Employee ID"] = drivers.get(logout_name, "")
-                    add_master_entry(creds, row_dict)
-                    imported += 1
+                    all_rows.append(row_dict)
+                add_master_entries_batch(creds, all_rows)
                 _cached_master_roster.clear()
-                st.success(f"Imported {imported} entries.")
+                st.success(f"Imported {len(all_rows)} entries.")
                 st.rerun()
 
 
