@@ -12,7 +12,7 @@ from storage import upload_image
 from sheets import append_trip, update_trip_end, get_daily_roster
 from db import get_drivers, get_clients, get_vehicles
 from alert_monitor import _compute_shift_expected_time, calculate_delay
-from supabase_client import save_trip_to_supabase, update_trip_end_in_supabase
+from supabase_client import save_trip_to_supabase, update_trip_end_in_supabase, get_incomplete_trip
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -104,6 +104,32 @@ def show_start_form():
     driver_name = st.selectbox("Driver Name", list(drivers.keys()))
     emp_id = drivers[driver_name]
     st.caption(f"Employee ID: **{emp_id}**  |  Date: **{datetime.now(IST).strftime('%d %b %Y')}**")
+
+    today = datetime.now(IST).strftime("%Y-%m-%d")
+    incomplete = get_incomplete_trip(emp_id, today)
+    if incomplete:
+        st.warning(
+            f"⚠️ You have an incomplete trip started at **{incomplete['start_time']}**. "
+            "Resume it to submit end details."
+        )
+        if st.button("▶ Resume Trip", use_container_width=True, type="primary"):
+            st.session_state["trip"] = {
+                "trip_id":             incomplete["trip_id"],
+                "driver_name":         incomplete["driver_name"],
+                "emp_id":              incomplete["employee_id"],
+                "client":              incomplete["client"],
+                "vehicle_number":      incomplete["vehicle_number"],
+                "date":                incomplete["trip_date"],
+                "start_time":          incomplete["start_time"],
+                "start_km":            incomplete.get("start_odometer") or 0,
+                "start_location":      incomplete.get("start_location", ""),
+                "expected_start_time": incomplete.get("expected_start_time", ""),
+                "delay_minutes":       incomplete.get("delay_minutes", 0),
+                "status":              incomplete.get("status", ""),
+            }
+            st.session_state["phase"] = "end"
+            st.rerun()
+        st.divider()
 
     clients = get_clients()
     vehicles = get_vehicles()

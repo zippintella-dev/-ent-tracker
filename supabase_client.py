@@ -5,6 +5,26 @@ def get_supabase_client():
     return _get_client()
 
 
+def get_incomplete_trip(emp_id: str, trip_date: str) -> dict | None:
+    """Return the most recent incomplete trip for a driver today, or None."""
+    try:
+        result = (
+            get_supabase_client()
+            .table("trip_logs")
+            .select("*")
+            .eq("employee_id", emp_id)
+            .eq("trip_date", trip_date)
+            .is_("end_time", "null")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"[Supabase] get_incomplete_trip failed: {e}")
+        return None
+
+
 def save_trip_to_supabase(trip_data: dict):
     """
     Insert trip-start record into trip_logs.
