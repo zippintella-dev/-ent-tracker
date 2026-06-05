@@ -8,10 +8,10 @@ IST = ZoneInfo("Asia/Kolkata")
 
 from auth import get_credentials
 from storage import upload_image
-from sheets import append_trip, update_trip_end
+from sheets import append_trip, update_trip_end, get_daily_roster
 from db import get_drivers, get_clients, get_vehicles
 from alert_monitor import _compute_shift_expected_time, calculate_delay
-from sheets import get_daily_roster
+from supabase_client import save_trip_to_supabase, update_trip_end_in_supabase
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -119,6 +119,8 @@ def show_start_form():
                     start_right_url = upload_image(right.getvalue(), f"{tid}_start_right.jpg")
                     start_odo_url = upload_image(odo.getvalue(), f"{tid}_start_odo.jpg")
 
+                    start_location = maps_link(st.session_state.get("location_start"))
+
                     append_trip(creds, {
                         "Trip ID": tid,
                         "Driver Name": driver_name,
@@ -134,7 +136,7 @@ def show_start_form():
                         "Start Odometer (km)": start_km,
                         "End Odometer (km)": "",
                         "Distance (km)": "",
-                        "Start Location": maps_link(st.session_state.get("location_start")),
+                        "Start Location": start_location,
                         "End Location": "",
                         "Start - Left Photo": start_left_url,
                         "Start - Right Photo": start_right_url,
@@ -143,6 +145,24 @@ def show_start_form():
                         "End - Right Photo": "",
                         "End - Odometer Photo": "",
                         "Submitted At": "",
+                    })
+
+                    save_trip_to_supabase({
+                        "trip_id":              tid,
+                        "driver_name":          driver_name,
+                        "employee_id":          emp_id,
+                        "client":               client,
+                        "vehicle_number":       vehicle_number,
+                        "trip_date":            today,
+                        "start_time":           start_time,
+                        "expected_start_time":  expected_start,
+                        "delay_minutes":        delay_minutes,
+                        "status":               status,
+                        "start_odometer":       start_km,
+                        "start_location":       start_location,
+                        "start_left_photo":     start_left_url,
+                        "start_right_photo":    start_right_url,
+                        "start_odometer_photo": start_odo_url,
                     })
             except Exception as e:
                 st.error(f"Failed to start trip: {e}")
@@ -157,7 +177,7 @@ def show_start_form():
                 "date": today,
                 "start_time": start_time,
                 "start_km": start_km,
-                "start_location": maps_link(st.session_state.get("location_start")),
+                "start_location": start_location,
                 "expected_start_time": expected_start,
                 "delay_minutes": delay_minutes,
                 "status": status,
@@ -229,15 +249,32 @@ def show_end_form():
                 def upload(data, name):
                     return upload_image(data, f"{trip['trip_id']}_{name}.jpg")
 
+                end_location = maps_link(st.session_state.get("location_end"))
+                end_left_url = upload(left.getvalue(), "end_left")
+                end_right_url = upload(right.getvalue(), "end_right")
+                end_odo_url = upload(odo.getvalue(), "end_odo")
+                submitted_at = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
+
                 update_trip_end(creds, trip["trip_id"], {
                     "End Time": end_time,
                     "End Odometer (km)": end_km,
                     "Distance (km)": distance,
-                    "End Location": maps_link(st.session_state.get("location_end")),
-                    "End - Left Photo": upload(left.getvalue(), "end_left"),
-                    "End - Right Photo": upload(right.getvalue(), "end_right"),
-                    "End - Odometer Photo": upload(odo.getvalue(), "end_odo"),
-                    "Submitted At": datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S"),
+                    "End Location": end_location,
+                    "End - Left Photo": end_left_url,
+                    "End - Right Photo": end_right_url,
+                    "End - Odometer Photo": end_odo_url,
+                    "Submitted At": submitted_at,
+                })
+
+                update_trip_end_in_supabase(trip["trip_id"], {
+                    "end_time":           end_time,
+                    "end_odometer":       end_km,
+                    "distance_km":        distance,
+                    "end_location":       end_location,
+                    "end_left_photo":     end_left_url,
+                    "end_right_photo":    end_right_url,
+                    "end_odometer_photo": end_odo_url,
+                    "submitted_at":       submitted_at,
                 })
         except Exception as e:
             st.error(f"Failed to save trip: {e}")
