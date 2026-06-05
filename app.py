@@ -55,8 +55,12 @@ def trip_id(emp_id: str) -> str:
 
 
 def camera_block(label: str, key: str):
-    st.markdown(f"**{label}**")
-    return st.camera_input("", key=key, label_visibility="collapsed")
+    return st.file_uploader(
+        label,
+        type=["jpg", "jpeg", "png"],
+        key=key,
+        help="Tap to take a photo or choose from gallery",
+    )
 
 
 
