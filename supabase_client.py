@@ -25,6 +25,25 @@ def get_incomplete_trip(emp_id: str, trip_date: str) -> dict | None:
         return None
 
 
+def has_completed_trip_today(emp_id: str, trip_date: str) -> bool:
+    """Return True if the driver has at least one completed trip today."""
+    try:
+        result = (
+            get_supabase_client()
+            .table("trip_logs")
+            .select("trip_id")
+            .eq("employee_id", emp_id)
+            .eq("trip_date", trip_date)
+            .not_.is_("end_time", "null")
+            .limit(1)
+            .execute()
+        )
+        return bool(result.data)
+    except Exception as e:
+        print(f"[Supabase] has_completed_trip_today failed: {e}")
+        return False  # fail-safe: treat as first trip so side photos are shown
+
+
 def save_trip_to_supabase(trip_data: dict):
     """
     Insert trip-start record into trip_logs.

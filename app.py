@@ -12,7 +12,10 @@ from storage import upload_image
 from sheets import append_trip, update_trip_end, get_daily_roster
 from db import get_drivers, get_clients, get_vehicles
 from alert_monitor import _compute_shift_expected_time, calculate_delay
-from supabase_client import save_trip_to_supabase, update_trip_end_in_supabase, get_incomplete_trip
+from supabase_client import (
+    save_trip_to_supabase, update_trip_end_in_supabase,
+    get_incomplete_trip, has_completed_trip_today,
+)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -151,15 +154,24 @@ def show_start_form():
         st.caption("📍 Press the button above to capture your location")
 
     st.divider()
+    is_first_trip = not has_completed_trip_today(emp_id, today)
     st.subheader("📸 Start Photos")
     _inject_camera_capture()
-    left = camera_block("Left Side of Vehicle", "start_left")
-    right = camera_block("Right Side of Vehicle", "start_right")
+    if is_first_trip:
+        st.caption("First trip of your shift — side photos required")
+        left  = camera_block("Left Side of Vehicle",  "start_left")
+        right = camera_block("Right Side of Vehicle", "start_right")
+    else:
+        st.caption("Side photos only required on your first trip of the shift")
+        left = right = None
     odo = camera_block("Odometer", "start_odo")
 
     st.divider()
     if st.button("▶  Start Trip", use_container_width=True, type="primary"):
-        missing = [n for n, f in [("Left side", left), ("Right side", right), ("Odometer", odo)] if not f]
+        required = [("Odometer", odo)]
+        if is_first_trip:
+            required = [("Left side", left), ("Right side", right)] + required
+        missing = [n for n, f in required if not f]
         if missing:
             st.warning(f"Please capture: {', '.join(missing)}")
         elif not st.session_state.get("location_start"):
@@ -177,9 +189,9 @@ def show_start_form():
                     delay_minutes = calculate_delay(start_time, expected_start)
                     status = "On Time" if delay_minutes == 0 else "Delayed"
 
-                    start_left_url = upload_image(left.getvalue(), f"{tid}_start_left.jpg")
-                    start_right_url = upload_image(right.getvalue(), f"{tid}_start_right.jpg")
-                    start_odo_url = upload_image(odo.getvalue(), f"{tid}_start_odo.jpg")
+                    start_left_url  = upload_image(left.getvalue(),  f"{tid}_start_left.jpg")  if left  else ""
+                    start_right_url = upload_image(right.getvalue(), f"{tid}_start_right.jpg") if right else ""
+                    start_odo_url   = upload_image(odo.getvalue(),   f"{tid}_start_odo.jpg")
 
                     start_location = maps_link(st.session_state.get("location_start"))
 
@@ -271,9 +283,10 @@ def show_end_form():
     st.divider()
     st.subheader("📸 End Photos")
     _inject_camera_capture()
-    left = camera_block("Left Side of Vehicle", "end_left")
-    right = camera_block("Right Side of Vehicle", "end_right")
-    odo = camera_block("Odometer", "end_odo")
+    odo   = camera_block("Odometer", "end_odo")
+    st.caption("Side photos — upload only if this is your last trip of the shift")
+    left  = camera_block("Left Side of Vehicle (optional)", "end_left")
+    right = camera_block("Right Side of Vehicle (optional)", "end_right")
 
     st.divider()
 
@@ -290,9 +303,8 @@ def show_end_form():
         st.rerun()
 
     if submit:
-        missing = [n for n, f in [("Left side", left), ("Right side", right), ("Odometer", odo)] if not f]
-        if missing:
-            st.warning(f"Please capture: {', '.join(missing)}")
+        if not odo:
+            st.warning("Please capture the Odometer photo.")
             return
         if not st.session_state.get("location_end"):
             st.warning("Please capture your location first.")
@@ -300,8 +312,6 @@ def show_end_form():
         if end_km <= trip["start_km"]:
             st.warning("End odometer must be greater than start odometer.")
             return
-
-        assert left and right and odo  # guaranteed by missing check above
 
         try:
             with st.spinner("Uploading photos and saving trip..."):
@@ -313,9 +323,9 @@ def show_end_form():
                     return upload_image(data, f"{trip['trip_id']}_{name}.jpg")
 
                 end_location = maps_link(st.session_state.get("location_end"))
-                end_left_url = upload(left.getvalue(), "end_left")
-                end_right_url = upload(right.getvalue(), "end_right")
-                end_odo_url = upload(odo.getvalue(), "end_odo")
+                end_odo_url   = upload(odo.getvalue(),   "end_odo")
+                end_left_url  = upload(left.getvalue(),  "end_left")  if left  else ""
+                end_right_url = upload(right.getvalue(), "end_right") if right else ""
                 submitted_at = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
 
                 update_trip_end(creds, trip["trip_id"], {
