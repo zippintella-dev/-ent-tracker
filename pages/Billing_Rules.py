@@ -20,39 +20,39 @@ def check_password() -> bool:
 
 def show_add_rule(clients: list):
     with st.expander("➕ Add New Rule"):
-        with st.form("add_billing_rule", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            client_name  = col1.selectbox("Client", clients)
-            billing_type = col2.selectbox("Billing Type", ["FLAT", "SLAB"])
+        # billing_type must be outside st.form so changing it triggers an
+        # immediate rerun and the SLAB km fields appear dynamically
+        col1, col2 = st.columns(2)
+        client_name  = col1.selectbox("Client", clients, key="ar_client")
+        billing_type = col2.selectbox("Billing Type", ["FLAT", "SLAB"], key="ar_type")
 
-            if billing_type == "SLAB":
-                col3, col4 = st.columns(2)
-                min_km = col3.number_input("Min KM", min_value=0.0, step=1.0)
-                max_km = col4.number_input("Max KM", min_value=0.0, step=1.0)
+        min_km = max_km = None
+        if billing_type == "SLAB":
+            col3, col4 = st.columns(2)
+            min_km = col3.number_input("Min KM", min_value=0.0, step=1.0, key="ar_min_km")
+            max_km = col4.number_input("Max KM", min_value=0.0, step=1.0, key="ar_max_km")
+
+        amount = st.number_input("Amount (₹)", min_value=0.0, step=50.0, key="ar_amount")
+
+        if st.button("Add Rule", use_container_width=True, type="primary", key="ar_submit"):
+            if not client_name:
+                st.warning("Client name is required.")
+            elif billing_type == "SLAB" and (max_km is None or max_km <= min_km):
+                st.warning("Max KM must be greater than Min KM.")
+            elif amount <= 0:
+                st.warning("Amount must be greater than zero.")
             else:
-                min_km = max_km = None
-
-            amount = st.number_input("Amount (₹)", min_value=0.0, step=50.0)
-
-            if st.form_submit_button("Add Rule", use_container_width=True, type="primary"):
-                if not client_name:
-                    st.warning("Client name is required.")
-                elif billing_type == "SLAB" and max_km <= min_km:
-                    st.warning("Max KM must be greater than Min KM.")
-                elif amount <= 0:
-                    st.warning("Amount must be greater than zero.")
-                else:
-                    rule = {
-                        "client_name":  client_name,
-                        "billing_type": billing_type,
-                        "amount":       amount,
-                    }
-                    if billing_type == "SLAB":
-                        rule["min_km"] = min_km
-                        rule["max_km"] = max_km
-                    add_billing_rule(rule)
-                    st.success(f"Rule added for {client_name}.")
-                    st.rerun()
+                rule = {
+                    "client_name":  client_name,
+                    "billing_type": billing_type,
+                    "amount":       amount,
+                }
+                if billing_type == "SLAB":
+                    rule["min_km"] = min_km
+                    rule["max_km"] = max_km
+                add_billing_rule(rule)
+                st.success(f"Rule added for {client_name}.")
+                st.rerun()
 
 
 def show_rules_table():
