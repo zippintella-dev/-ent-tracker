@@ -81,7 +81,7 @@ def update_trip_end_in_supabase(trip_id: str, end_data: dict):
     Non-blocking — a failure here never stops the submit flow.
     """
     try:
-        get_supabase_client().table("trip_logs").update({
+        payload = {
             "end_time":           end_data.get("end_time", ""),
             "end_odometer":       end_data.get("end_odometer"),
             "distance_km":        end_data.get("distance_km"),
@@ -90,6 +90,9 @@ def update_trip_end_in_supabase(trip_id: str, end_data: dict):
             "end_right_photo":    end_data.get("end_right_photo", ""),
             "end_odometer_photo": end_data.get("end_odometer_photo", ""),
             "submitted_at":       end_data.get("submitted_at", ""),
-        }).eq("trip_id", trip_id).execute()
+        }
+        if end_data.get("revenue") is not None:
+            payload["revenue"] = end_data["revenue"]
+        get_supabase_client().table("trip_logs").update(payload).eq("trip_id", trip_id).execute()
     except Exception as e:
         print(f"[Supabase] update_trip_end_in_supabase failed: {e}")

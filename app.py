@@ -16,6 +16,7 @@ from supabase_client import (
     save_trip_to_supabase, update_trip_end_in_supabase,
     get_incomplete_trip, has_completed_trip_today,
 )
+from billing_engine import calculate_revenue
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -312,6 +313,7 @@ def show_end_form():
                 creds = get_credentials()
                 end_time = datetime.now(IST).strftime("%H:%M:%S")
                 distance = end_km - trip["start_km"]
+                revenue  = calculate_revenue(trip["client"], distance)
 
                 def upload(data, name):
                     return upload_image(data, f"{trip['trip_id']}_{name}.jpg")
@@ -342,6 +344,7 @@ def show_end_form():
                     "end_right_photo":    end_right_url,
                     "end_odometer_photo": end_odo_url,
                     "submitted_at":       submitted_at,
+                    "revenue":            revenue,
                 })
         except Exception as e:
             st.error(f"Failed to save trip: {e}")
