@@ -55,6 +55,11 @@ def show_add_rule(clients: list):
                 st.rerun()
 
 
+def _to_python(val):
+    """Convert pandas/numpy NaN to None for JSON-safe Supabase writes."""
+    return None if pd.isna(val) else val
+
+
 def show_rules_table():
     rules = get_all_billing_rules()
     if not rules:
@@ -62,22 +67,23 @@ def show_rules_table():
         return
 
     df_original = pd.DataFrame(rules)
-    # Reorder columns for display
     display_cols = ["id", "client_name", "billing_type", "min_km", "max_km", "amount", "active", "created_at"]
     display_cols = [c for c in display_cols if c in df_original.columns]
     df_original = df_original[display_cols]
 
+    st.caption("✏️ Click any cell to edit. Toggle the **Active** checkbox to deactivate a rule. Press **Save Changes** when done.")
+
     df_edited = st.data_editor(
         df_original,
         column_config={
-            "id":           st.column_config.NumberColumn("ID",           disabled=True),
-            "client_name":  st.column_config.TextColumn("Client",         disabled=True),
-            "billing_type": st.column_config.SelectboxColumn("Type",      options=["FLAT", "SLAB"]),
+            "id":           st.column_config.NumberColumn("ID",          disabled=True),
+            "client_name":  st.column_config.TextColumn("Client",        disabled=True),
+            "billing_type": st.column_config.SelectboxColumn("Type",     options=["FLAT", "SLAB"]),
             "min_km":       st.column_config.NumberColumn("Min KM"),
             "max_km":       st.column_config.NumberColumn("Max KM"),
-            "amount":       st.column_config.NumberColumn("Amount (₹)",   format="₹%.2f"),
+            "amount":       st.column_config.NumberColumn("Amount (₹)",  format="₹%.2f"),
             "active":       st.column_config.CheckboxColumn("Active"),
-            "created_at":   st.column_config.TextColumn("Created",        disabled=True),
+            "created_at":   st.column_config.TextColumn("Created",       disabled=True),
         },
         use_container_width=True,
         hide_index=True,
@@ -90,11 +96,14 @@ def show_rules_table():
             if orig_rows.empty:
                 continue
             orig = orig_rows.iloc[0]
-            changed = {
-                k: row[k]
-                for k in ["billing_type", "min_km", "max_km", "amount", "active"]
-                if k in row and row[k] != orig[k]
-            }
+            changed = {}
+            for k in ["billing_type", "min_km", "max_km", "amount", "active"]:
+                if k not in row:
+                    continue
+                row_val  = _to_python(row[k])
+                orig_val = _to_python(orig[k])
+                if row_val != orig_val:
+                    changed[k] = row_val
             if changed:
                 update_billing_rule(int(row["id"]), changed)
                 saved += 1
