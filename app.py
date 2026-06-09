@@ -1,6 +1,5 @@
 import base64
 import streamlit as st
-import streamlit.components.v1 as components
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from streamlit_geolocation import streamlit_geolocation
@@ -60,43 +59,9 @@ def trip_id(emp_id: str) -> str:
     return f"{emp_id}_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}"
 
 
-def _inject_camera_capture():
-    """
-    After file inputs render, set capture="environment" so mobile browsers
-    open the rear camera directly instead of showing the gallery picker.
-    Uses window.parent.document because Streamlit components run in iframes.
-    """
-    components.html("""
-        <script>
-        (function () {
-            function applyCapture() {
-                try {
-                    window.parent.document
-                        .querySelectorAll('input[type="file"]')
-                        .forEach(function (el) {
-                            el.setAttribute("capture", "environment");
-                            el.setAttribute("accept", "image/*");
-                        });
-                } catch (e) {}
-            }
-            applyCapture();
-            try {
-                new MutationObserver(applyCapture).observe(
-                    window.parent.document.body,
-                    { childList: true, subtree: true }
-                );
-            } catch (e) {}
-        })();
-        </script>
-    """, height=0)
-
-
 def camera_block(label: str, key: str):
-    return st.file_uploader(
-        label,
-        type=["jpg", "jpeg", "png"],
-        key=key,
-    )
+    st.markdown(f"**{label}**")
+    return st.camera_input("", key=key, label_visibility="collapsed")
 
 
 
@@ -152,7 +117,6 @@ def show_start_form():
     st.divider()
     is_first_trip = not has_completed_trip_today(emp_id, today)
     st.subheader("📸 Start Photos")
-    _inject_camera_capture()
     if is_first_trip:
         st.caption("First trip of your shift — side photos required")
         left  = camera_block("Left Side of Vehicle",  "start_left")
@@ -280,7 +244,6 @@ def show_end_form():
 
     st.divider()
     st.subheader("📸 End Photos")
-    _inject_camera_capture()
     odo   = camera_block("Odometer", "end_odo")
     st.caption("Side photos — upload only if this is your last trip of the shift")
     left  = camera_block("Left Side of Vehicle (optional)", "end_left")
