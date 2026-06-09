@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://unpkg.com/streamlit-component-lib/dist/StreamlitLib.bundle.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { padding: 4px 4px 10px; font-family: sans-serif; }
@@ -29,21 +28,32 @@
     <div class="done" id="done">✅ Captured</div>
 
     <script>
-        Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, function (ev) {
-            var args = ev.detail.args || {};
-            if (args.label) {
-                document.getElementById('btn').textContent = '📷 ' + args.label;
+        function post(type, extra) {
+            window.parent.postMessage(Object.assign({ type: type }, extra || {}), "*");
+        }
+
+        function setHeight() {
+            post("streamlit:setFrameHeight", { height: document.documentElement.scrollHeight });
+        }
+
+        // Receive args from Streamlit (label, etc.)
+        window.addEventListener("message", function (e) {
+            if (e.data.type === "streamlit:render") {
+                var label = (e.data.args || {}).label;
+                if (label) document.getElementById("btn").textContent = "📷 " + label;
+                setHeight();
             }
-            Streamlit.setFrameHeight();
         });
 
-        Streamlit.setComponentReady();
+        // Signal ready — no CDN needed, raw postMessage protocol
+        post("streamlit:componentReady", { apiVersion: 1 });
+        setHeight();
 
-        document.getElementById('btn').addEventListener('click', function () {
-            document.getElementById('inp').click();
+        document.getElementById("btn").addEventListener("click", function () {
+            document.getElementById("inp").click();
         });
 
-        document.getElementById('inp').addEventListener('change', function (e) {
+        document.getElementById("inp").addEventListener("change", function (e) {
             var file = e.target.files[0];
             if (!file) return;
 
@@ -51,19 +61,20 @@
             reader.onload = function (ev) {
                 var img = new Image();
                 img.onload = function () {
-                    // Resize to max 1280 px and compress to JPEG 82 %
-                    var maxDim = 1280, quality = 0.82;
-                    var ratio = Math.min(1, maxDim / Math.max(img.width, img.height));
-                    var canvas = document.createElement('canvas');
-                    canvas.width  = Math.round(img.width  * ratio);
-                    canvas.height = Math.round(img.height * ratio);
-                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    // Resize to max 1280 px, compress to JPEG 82 %
+                    var maxDim = 1280, q = 0.82;
+                    var r = Math.min(1, maxDim / Math.max(img.width, img.height));
+                    var c = document.createElement("canvas");
+                    c.width  = Math.round(img.width  * r);
+                    c.height = Math.round(img.height * r);
+                    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
 
-                    document.getElementById('btn').style.display = 'none';
-                    document.getElementById('done').style.display = 'block';
-                    Streamlit.setFrameHeight();
+                    document.getElementById("btn").style.display = "none";
+                    document.getElementById("done").style.display = "block";
+                    setHeight();
 
-                    Streamlit.setComponentValue(canvas.toDataURL('image/jpeg', quality));
+                    post("streamlit:setComponentValue",
+                         { value: c.toDataURL("image/jpeg", q), dataType: "json" });
                 };
                 img.src = ev.target.result;
             };
