@@ -47,6 +47,8 @@ def init_state():
     st.session_state.setdefault("location_start", None)
     st.session_state.setdefault("location_end", None)
     st.session_state.setdefault("confirm_high_distance", False)
+    st.session_state.setdefault("start_photos", {})
+    st.session_state.setdefault("end_photos", {})
 
 
 def maps_link(loc) -> str:
@@ -59,8 +61,8 @@ def trip_id(emp_id: str) -> str:
     return f"{emp_id}_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}"
 
 
-def camera_block(label: str, key: str):
-    return st.file_uploader(label, type=["jpg", "jpeg", "png"], key=key)
+def _next_photo(photos: dict, steps: list) -> tuple | None:
+    return next(((k, l) for k, l in steps if not photos.get(k)), None)
 
 
 
@@ -116,23 +118,34 @@ def show_start_form():
     st.divider()
     is_first_trip = not has_completed_trip_today(emp_id, today)
     st.subheader("📸 Start Photos")
+
     if is_first_trip:
-        st.caption("First trip of your shift — side photos required")
-        left  = camera_block("Left Side of Vehicle",  "start_left")
-        right = camera_block("Right Side of Vehicle", "start_right")
+        photo_steps = [("left", "Left Side of Vehicle"), ("right", "Right Side of Vehicle"), ("odo", "Odometer")]
+        st.caption("First trip of your shift — 3 photos, one at a time")
     else:
+        photo_steps = [("odo", "Odometer")]
         st.caption("Side photos only required on your first trip of the shift")
-        left = right = None
-    odo = camera_block("Odometer", "start_odo")
+
+    photos = st.session_state["start_photos"]
+    for key, label in photo_steps:
+        if photos.get(key):
+            st.caption(f"✅ {label}")
+    pending = _next_photo(photos, photo_steps)
+    if pending:
+        key, label = pending
+        taken = st.camera_input(f"📸 {label}", key=f"sc_{key}")
+        if taken:
+            photos[key] = taken.getvalue()
+            st.rerun()
+    else:
+        st.success("All photos captured")
 
     st.divider()
     if st.button("▶  Start Trip", use_container_width=True, type="primary"):
-        required = [("Odometer", odo)]
-        if is_first_trip:
-            required = [("Left side", left), ("Right side", right)] + required
-        missing = [n for n, f in required if not f]
-        if missing:
-            st.warning(f"Please capture: {', '.join(missing)}")
+        photos = st.session_state["start_photos"]
+        pending = _next_photo(photos, photo_steps)
+        if pending:
+            st.warning(f"Please capture the {pending[1]} photo first.")
         elif not st.session_state.get("location_start"):
             st.warning("Please capture your location first.")
         elif start_km == 0:
@@ -150,9 +163,9 @@ def show_start_form():
                     delay_minutes = calculate_delay(start_time, expected_start)
                     status = "On Time" if delay_minutes == 0 else "Delayed"
 
-                    start_left_url  = upload_image(left.getvalue(),  f"{tid}_start_left.jpg")  if left  else ""
-                    start_right_url = upload_image(right.getvalue(), f"{tid}_start_right.jpg") if right else ""
-                    start_odo_url   = upload_image(odo.getvalue(),   f"{tid}_start_odo.jpg")
+                    start_left_url  = upload_image(photos["left"],  f"{tid}_start_left.jpg")  if photos.get("left")  else ""
+                    start_right_url = upload_image(photos["right"], f"{tid}_start_right.jpg") if photos.get("right") else ""
+                    start_odo_url   = upload_image(photos["odo"],   f"{tid}_start_odo.jpg")
 
                     start_location = maps_link(st.session_state.get("location_start"))
 
@@ -218,6 +231,7 @@ def show_start_form():
                 "status": status,
             }
             st.session_state["phase"] = "end"
+            st.session_state["start_photos"] = {}
             st.rerun()
 
 
@@ -243,10 +257,31 @@ def show_end_form():
 
     st.divider()
     st.subheader("📸 End Photos")
-    odo   = camera_block("Odometer", "end_odo")
-    st.caption("Side photos — upload only if this is your last trip of the shift")
-    left  = camera_block("Left Side of Vehicle (optional)", "end_left")
-    right = camera_block("Right Side of Vehicle (optional)", "end_right")
+    end_photos = st.session_state["end_photos"]
+
+    if not end_photos.get("odo"):
+        taken = st.camera_input("📸 Odometer", key="ec_odo")
+        if taken:
+            end_photos["odo"] = taken.getvalue()
+            st.rerun()
+    else:
+        st.caption("✅ Odometer")
+        last_trip = st.checkbox("This is my last trip of the shift", key="end_last_trip_check")
+        if last_trip:
+            if not end_photos.get("left"):
+                taken = st.camera_input("📸 Left Side of Vehicle", key="ec_left")
+                if taken:
+                    end_photos["left"] = taken.getvalue()
+                    st.rerun()
+            else:
+                st.caption("✅ Left Side")
+                if not end_photos.get("right"):
+                    taken = st.camera_input("📸 Right Side of Vehicle", key="ec_right")
+                    if taken:
+                        end_photos["right"] = taken.getvalue()
+                        st.rerun()
+                else:
+                    st.caption("✅ Right Side")
 
     st.divider()
 
@@ -261,10 +296,12 @@ def show_end_form():
         st.session_state["trip"] = {}
         st.session_state["location_end"] = None
         st.session_state["confirm_high_distance"] = False
+        st.session_state["end_photos"] = {}
         st.rerun()
 
     if submit:
-        if not odo:
+        end_photos = st.session_state["end_photos"]
+        if not end_photos.get("odo"):
             st.warning("Please capture the Odometer photo.")
             return
         if not st.session_state.get("location_end"):
@@ -297,9 +334,10 @@ def show_end_form():
                     return upload_image(data, f"{trip['trip_id']}_{name}.jpg")
 
                 end_location = maps_link(st.session_state.get("location_end"))
-                end_odo_url   = upload(odo.getvalue(),   "end_odo")
-                end_left_url  = upload(left.getvalue(),  "end_left")  if left  else ""
-                end_right_url = upload(right.getvalue(), "end_right") if right else ""
+                end_photos    = st.session_state["end_photos"]
+                end_odo_url   = upload(end_photos["odo"],   "end_odo")
+                end_left_url  = upload(end_photos["left"],  "end_left")  if end_photos.get("left")  else ""
+                end_right_url = upload(end_photos["right"], "end_right") if end_photos.get("right") else ""
                 submitted_at = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
 
                 update_trip_end(creds, trip["trip_id"], {
@@ -338,6 +376,7 @@ def show_end_form():
         st.session_state["phase"] = "saved"
         st.session_state["trip"] = {}
         st.session_state["confirm_high_distance"] = False
+        st.session_state["end_photos"] = {}
         st.rerun()
 
 
@@ -360,6 +399,8 @@ def show_saved_screen():
         st.session_state["last_trip"] = {}
         st.session_state["location_start"] = None
         st.session_state["location_end"] = None
+        st.session_state["start_photos"] = {}
+        st.session_state["end_photos"] = {}
         st.rerun()
 
 
