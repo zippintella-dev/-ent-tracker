@@ -47,6 +47,7 @@ def init_state():
     st.session_state.setdefault("last_trip", {})
     st.session_state.setdefault("location_start", None)
     st.session_state.setdefault("location_end", None)
+    st.session_state.setdefault("confirm_high_distance", False)
 
 
 def maps_link(loc) -> str:
@@ -171,6 +172,8 @@ def show_start_form():
             st.warning(f"Please capture: {', '.join(missing)}")
         elif not st.session_state.get("location_start"):
             st.warning("Please capture your location first.")
+        elif start_km == 0:
+            st.warning("Please enter your actual odometer reading. It cannot be 0.")
         else:
             try:
                 with st.spinner("Starting trip..."):
@@ -295,6 +298,7 @@ def show_end_form():
         st.session_state["phase"] = "start"
         st.session_state["trip"] = {}
         st.session_state["location_end"] = None
+        st.session_state["confirm_high_distance"] = False
         st.rerun()
 
     if submit:
@@ -306,6 +310,18 @@ def show_end_form():
             return
         if end_km <= trip["start_km"]:
             st.warning("End odometer must be greater than start odometer.")
+            return
+        projected_distance = end_km - trip["start_km"]
+        if projected_distance > 100 and not st.session_state.get("confirm_high_distance"):
+            st.warning(
+                f"⚠️ Calculated distance is **{projected_distance} km** — this seems unusually high. "
+                "Please verify your odometer readings."
+            )
+            col_a, col_b = st.columns(2)
+            if col_a.button("✅ Readings are correct, submit", type="primary"):
+                st.session_state["confirm_high_distance"] = True
+                st.rerun()
+            col_b.button("✏️ Re-enter odometer")
             return
 
         try:
@@ -359,6 +375,7 @@ def show_end_form():
         }
         st.session_state["phase"] = "saved"
         st.session_state["trip"] = {}
+        st.session_state["confirm_high_distance"] = False
         st.rerun()
 
 
