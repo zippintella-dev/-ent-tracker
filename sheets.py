@@ -130,5 +130,42 @@ def update_daily_entry(creds, row_number: int, row: dict):
     )
 
 
+def replace_route_driver(
+    creds,
+    date_str: str,
+    rt_no: str,
+    slot: str,
+    new_driver_name: str,
+    new_driver_emp_id: str,
+) -> int:
+    """Replace login/logout driver on every row matching date + RT No.
+    slot: 'login', 'logout', or 'both'. Returns number of rows updated."""
+    sheet = _open_daily(creds)
+    all_rows = sheet.get_all_records()
+
+    updates = []
+    for i, row in enumerate(all_rows):
+        if _normalize_date(str(row.get("Date", ""))) != date_str:
+            continue
+        if str(row.get("RT No", "")).strip() != rt_no.strip():
+            continue
+        updated = dict(row)
+        if slot in ("login", "both"):
+            updated["Login Driver Name"]        = new_driver_name
+            updated["Login Driver Employee ID"] = new_driver_emp_id
+        if slot in ("logout", "both"):
+            updated["Logout Driver Name"]        = new_driver_name
+            updated["Logout Driver Employee ID"] = new_driver_emp_id
+        updates.append((i + 2, updated))
+
+    for row_number, row_data in updates:
+        sheet.update(
+            f"A{row_number}",
+            [[row_data.get(col, "") for col in ROSTER_COLUMNS]],
+            value_input_option="RAW",
+        )
+    return len(updates)
+
+
 def delete_daily_entry(creds, row_number: int):
     _open_daily(creds).delete_rows(row_number)

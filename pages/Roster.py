@@ -9,7 +9,8 @@ from telegram_bot import send_shift_message
 from sheets import (
     get_master_roster, add_master_entry, add_master_entries_batch,
     update_master_entry, delete_master_entry,
-    get_daily_roster, write_daily_roster, add_daily_entry, update_daily_entry, delete_daily_entry,
+    get_daily_roster, write_daily_roster, add_daily_entry, update_daily_entry,
+    delete_daily_entry, replace_route_driver,
 )
 from config import MASTER_ROSTER_COLUMNS, ROSTER_COLUMNS
 
@@ -310,6 +311,28 @@ def show_daily_roster(creds, drivers):
             _send_roster_to_drivers(existing, date_str, drivers)
 
     st.divider()
+
+    if existing:
+        with st.expander("🔄 Replace Driver on Route"):
+            routes = sorted({r.get("RT No", "") for r in existing if r.get("RT No")})
+            col1, col2 = st.columns(2)
+            rt_no_sel   = col1.selectbox("Route", routes, key="rdr_rt")
+            slot_label  = col2.selectbox("Replace", ["Login Driver", "Logout Driver", "Both"], key="rdr_slot")
+            slot_map    = {"Login Driver": "login", "Logout Driver": "logout", "Both": "both"}
+            new_driver  = st.selectbox("New Driver", _driver_options(drivers), key="rdr_driver")
+
+            if st.button("Update All Rows for This Route", use_container_width=True, type="primary", key="rdr_submit"):
+                if new_driver == "— none —":
+                    st.warning("Select a driver.")
+                else:
+                    new_emp_id = drivers.get(new_driver, "")
+                    n = replace_route_driver(
+                        creds, date_str, rt_no_sel,
+                        slot_map[slot_label], new_driver, new_emp_id,
+                    )
+                    _cached_daily_roster.clear()
+                    st.success(f"Updated {n} row(s) on {rt_no_sel}.")
+                    st.rerun()
 
     with st.expander("➕ Add Entry"):
         result = _entry_form("add_daily_form", drivers)
