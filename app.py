@@ -1,5 +1,7 @@
 import base64
+import os
 import streamlit as st
+import streamlit.components.v1 as components
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from streamlit_geolocation import streamlit_geolocation
@@ -59,6 +61,19 @@ def maps_link(loc) -> str:
 
 def trip_id(emp_id: str) -> str:
     return f"{emp_id}_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}"
+
+
+_camera_input = components.declare_component(
+    "camera_capture",
+    path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "camera_component"),
+)
+
+
+def camera_block(label: str, key: str) -> bytes | None:
+    result = _camera_input(label=label, key=key, default=None)
+    if result and isinstance(result, str) and "," in result:
+        return base64.b64decode(result.split(",", 1)[1])
+    return None
 
 
 def _next_photo(photos: dict, steps: list) -> tuple | None:
@@ -133,9 +148,9 @@ def show_start_form():
     pending = _next_photo(photos, photo_steps)
     if pending:
         key, label = pending
-        taken = st.camera_input(f"📸 {label}", key=f"sc_{key}")
+        taken = camera_block(label, f"sc_{key}")
         if taken:
-            photos[key] = taken.getvalue()
+            photos[key] = taken
             st.rerun()
     else:
         st.success("All photos captured")
@@ -260,25 +275,25 @@ def show_end_form():
     end_photos = st.session_state["end_photos"]
 
     if not end_photos.get("odo"):
-        taken = st.camera_input("📸 Odometer", key="ec_odo")
+        taken = camera_block("Odometer", "ec_odo")
         if taken:
-            end_photos["odo"] = taken.getvalue()
+            end_photos["odo"] = taken
             st.rerun()
     else:
         st.caption("✅ Odometer")
         last_trip = st.checkbox("This is my last trip of the shift", key="end_last_trip_check")
         if last_trip:
             if not end_photos.get("left"):
-                taken = st.camera_input("📸 Left Side of Vehicle", key="ec_left")
+                taken = camera_block("Left Side of Vehicle", "ec_left")
                 if taken:
-                    end_photos["left"] = taken.getvalue()
+                    end_photos["left"] = taken
                     st.rerun()
             else:
                 st.caption("✅ Left Side")
                 if not end_photos.get("right"):
-                    taken = st.camera_input("📸 Right Side of Vehicle", key="ec_right")
+                    taken = camera_block("Right Side of Vehicle", "ec_right")
                     if taken:
-                        end_photos["right"] = taken.getvalue()
+                        end_photos["right"] = taken
                         st.rerun()
                 else:
                     st.caption("✅ Right Side")
