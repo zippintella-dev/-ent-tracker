@@ -1,92 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { padding: 4px 4px 10px; font-family: sans-serif; }
-        .btn {
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            width: 100%; padding: 11px 16px;
-            background: #ff4b4b; color: white;
-            font-size: 15px; font-weight: 600;
-            border-radius: 8px; cursor: pointer;
-            border: none; outline: none;
-        }
-        .btn:active { opacity: 0.75; }
-        input[type=file] { display: none; }
-        .done {
-            display: none; text-align: center;
-            color: #21c354; font-size: 14px; padding: 8px 0;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html, body { margin: 0; padding: 0; height: 58px; overflow: hidden; }
+    label {
+      display: flex; align-items: center; justify-content: center;
+      width: 100%; height: 58px;
+      background: #ff4b4b; color: #fff;
+      font: 600 15px/1 sans-serif; border-radius: 8px; cursor: pointer;
+    }
+    input { display: none; }
+  </style>
 </head>
 <body>
-    <button class="btn" id="btn">📷 Take Photo</button>
-    <input type="file" id="inp" accept="image/*" capture="environment">
-    <div class="done" id="done">✅ Captured</div>
+  <label id="lbl">📷 Take Photo<input type="file" accept="image/*" capture="environment" id="inp"></label>
 
-    <script>
-        function post(type, extra) {
-            window.parent.postMessage(Object.assign({ type: type }, extra || {}), "*");
-        }
+  <script>
+    var P = window.parent;
+    function send(t, x) { P.postMessage(Object.assign({ type: t }, x || {}), "*"); }
 
-        function setHeight() {
-            post("streamlit:setFrameHeight", { height: document.body.scrollHeight || 70 });
-        }
+    // Single delayed announce — avoids flooding Streamlit with componentReady
+    setTimeout(function () {
+      send("streamlit:componentReady", { apiVersion: 1 });
+      send("streamlit:setFrameHeight", { height: 58 });
+    }, 100);
 
-        // Retry componentReady until Streamlit acknowledges with a render message.
-        // Sending once risks a race condition where the parent hasn't attached its
-        // message listener yet, causing the iframe to stay hidden forever.
-        var renderReceived = false;
-        function announceReady() {
-            post("streamlit:componentReady", { apiVersion: 1 });
-            setHeight();
-            if (!renderReceived) setTimeout(announceReady, 150);
-        }
-        announceReady();
+    window.addEventListener("message", function (e) {
+      if (!e.data || e.data.type !== "streamlit:render") return;
+      send("streamlit:setFrameHeight", { height: 58 });
+      var lbl = (e.data.args || {}).label;
+      if (lbl) document.getElementById("lbl").firstChild.textContent = "📷 " + lbl;
+    });
 
-        window.addEventListener("message", function (e) {
-            if (e.data.type === "streamlit:render") {
-                renderReceived = true;
-                var label = (e.data.args || {}).label;
-                if (label) document.getElementById("btn").textContent = "📷 " + label;
-                setHeight();
-            }
-        });
-
-        document.getElementById("btn").addEventListener("click", function () {
-            document.getElementById("inp").click();
-        });
-
-        document.getElementById("inp").addEventListener("change", function (e) {
-            var file = e.target.files[0];
-            if (!file) return;
-
-            var reader = new FileReader();
-            reader.onload = function (ev) {
-                var img = new Image();
-                img.onload = function () {
-                    // Resize to max 1280 px, compress to JPEG 82 %
-                    var maxDim = 1280, q = 0.82;
-                    var r = Math.min(1, maxDim / Math.max(img.width, img.height));
-                    var c = document.createElement("canvas");
-                    c.width  = Math.round(img.width  * r);
-                    c.height = Math.round(img.height * r);
-                    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-
-                    document.getElementById("btn").style.display = "none";
-                    document.getElementById("done").style.display = "block";
-                    setHeight();
-
-                    post("streamlit:setComponentValue",
-                         { value: c.toDataURL("image/jpeg", q), dataType: "json" });
-                };
-                img.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-    </script>
+    document.getElementById("inp").addEventListener("change", function (e) {
+      var f = e.target.files[0];
+      if (!f) return;
+      var r = new FileReader();
+      r.onload = function (ev) {
+        var img = new Image();
+        img.onload = function () {
+          var max = 1280, q = 0.82;
+          var ratio = Math.min(1, max / Math.max(img.width, img.height));
+          var c = document.createElement("canvas");
+          c.width = Math.round(img.width * ratio);
+          c.height = Math.round(img.height * ratio);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          document.getElementById("lbl").firstChild.textContent = "✅ Captured";
+          document.getElementById("lbl").style.background = "#21c354";
+          send("streamlit:setFrameHeight", { height: 58 });
+          send("streamlit:setComponentValue", { value: c.toDataURL("image/jpeg", q), dataType: "json" });
+        };
+        img.src = ev.target.result;
+      };
+      r.readAsDataURL(f);
+    });
+  </script>
 </body>
 </html>
