@@ -1,7 +1,5 @@
 import base64
-import os
 import streamlit as st
-import streamlit.components.v1 as components
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from streamlit_geolocation import streamlit_geolocation
@@ -63,17 +61,9 @@ def trip_id(emp_id: str) -> str:
     return f"{emp_id}_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}"
 
 
-_camera_input = components.declare_component(
-    "camera_capture",
-    path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "camera_component"),
-)
-
-
 def camera_block(label: str, key: str) -> bytes | None:
-    result = _camera_input(label=label, key=key, default=None)
-    if result and isinstance(result, str) and "," in result:
-        return base64.b64decode(result.split(",", 1)[1])
-    return None
+    img = st.camera_input(label, key=key)
+    return img.read() if img else None
 
 
 def _next_photo(photos: dict, steps: list) -> tuple | None:
