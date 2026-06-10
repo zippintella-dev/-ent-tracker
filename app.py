@@ -136,7 +136,7 @@ def show_start_form():
 
     st.divider()
     last_end = get_last_completed_trip_time(emp_id)
-    is_first_trip = last_end is None or (datetime.now(IST) - last_end).total_seconds() >= 4 * 3600
+    is_first_trip = last_end is None or (datetime.now(IST) - last_end).total_seconds() >= 6 * 3600
     st.subheader("📸 Start Photos")
 
     if is_first_trip:
