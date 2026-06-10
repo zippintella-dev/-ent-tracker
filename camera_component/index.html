@@ -33,7 +33,7 @@
         }
 
         function setHeight() {
-            post("streamlit:setFrameHeight", { height: document.documentElement.scrollHeight });
+            post("streamlit:setFrameHeight", { height: document.body.scrollHeight || 70 });
         }
 
         // Retry componentReady until Streamlit acknowledges with a render message.
