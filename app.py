@@ -61,7 +61,21 @@ def trip_id(emp_id: str) -> str:
     return f"{emp_id}_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}"
 
 
+_REAR_CAM_PATCH = (
+    "<img src='x' onerror=\""
+    "if(!window._rp){"
+    "window._rp=1;"
+    "var o=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);"
+    "navigator.mediaDevices.getUserMedia=function(c){"
+    "if(c&&c.video&&typeof c.video==='object')c.video.facingMode={ideal:'environment'};"
+    "return o(c)"
+    "};"
+    "}this.remove()\" style='display:none'>"
+)
+
+
 def camera_block(label: str, key: str) -> bytes | None:
+    st.markdown(_REAR_CAM_PATCH, unsafe_allow_html=True)
     img = st.camera_input(label, key=key)
     return img.read() if img else None
 
