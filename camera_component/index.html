@@ -36,18 +36,25 @@
             post("streamlit:setFrameHeight", { height: document.documentElement.scrollHeight });
         }
 
-        // Receive args from Streamlit (label, etc.)
+        // Retry componentReady until Streamlit acknowledges with a render message.
+        // Sending once risks a race condition where the parent hasn't attached its
+        // message listener yet, causing the iframe to stay hidden forever.
+        var renderReceived = false;
+        function announceReady() {
+            post("streamlit:componentReady", { apiVersion: 1 });
+            setHeight();
+            if (!renderReceived) setTimeout(announceReady, 150);
+        }
+        announceReady();
+
         window.addEventListener("message", function (e) {
             if (e.data.type === "streamlit:render") {
+                renderReceived = true;
                 var label = (e.data.args || {}).label;
                 if (label) document.getElementById("btn").textContent = "📷 " + label;
                 setHeight();
             }
         });
-
-        // Signal ready — no CDN needed, raw postMessage protocol
-        post("streamlit:componentReady", { apiVersion: 1 });
-        setHeight();
 
         document.getElementById("btn").addEventListener("click", function () {
             document.getElementById("inp").click();
