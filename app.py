@@ -13,7 +13,7 @@ from db import get_drivers, get_clients, get_vehicles
 from alert_monitor import _compute_shift_expected_time, calculate_delay
 from supabase_client import (
     save_trip_to_supabase, update_trip_end_in_supabase,
-    get_incomplete_trip, has_completed_trip_today,
+    get_incomplete_trip, get_last_completed_trip_time,
 )
 from billing_engine import calculate_revenue
 
@@ -135,7 +135,8 @@ def show_start_form():
         st.caption("📍 Press the button above to capture your location")
 
     st.divider()
-    is_first_trip = not has_completed_trip_today(emp_id, today)
+    last_end = get_last_completed_trip_time(emp_id)
+    is_first_trip = last_end is None or (datetime.now(IST) - last_end).total_seconds() >= 4 * 3600
     st.subheader("📸 Start Photos")
 
     if is_first_trip:

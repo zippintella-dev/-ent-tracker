@@ -47,6 +47,31 @@ def has_completed_trip_today(emp_id: str, trip_date: str) -> bool:
         return False  # fail-safe: treat as first trip so side photos are shown
 
 
+def get_last_completed_trip_time(emp_id: str):
+    """Return IST datetime of driver's most recent completed trip end, or None."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    try:
+        result = (
+            get_supabase_client()
+            .table("trip_logs")
+            .select("submitted_at")
+            .eq("employee_id", emp_id)
+            .not_.is_("end_time", "null")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if result.data:
+            raw = result.data[0].get("submitted_at", "")
+            if raw:
+                return datetime.strptime(raw, "%Y-%m-%d %H:%M:%S").replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+        return None
+    except Exception as e:
+        print(f"[Supabase] get_last_completed_trip_time failed: {e}")
+        return None
+
+
 def save_trip_to_supabase(trip_data: dict):
     """
     Insert trip-start record into trip_logs.
